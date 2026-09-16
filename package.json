@@ -1,0 +1,17 @@
+{
+  "name": "folder-nav",
+  "version": "0.1.0",
+  "description": "Drill-down folder navigation for Obsidian's sidebar",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs production"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "esbuild": "^0.28.2",
+    "obsidian": "1.12.3",
+    "typescript": "^5.6.0"
+  }
+}
