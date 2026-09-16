@@ -1,5 +1,7 @@
 # Folder Nav
 
+**English** · [简体中文](README.zh.md)
+
 An Obsidian plugin that replaces the sidebar file tree with **drill-down navigation** — the sidebar shows one folder at a time, and a breadcrumb walks you back up. Like double-clicking into folders in Windows Explorer or macOS Finder.
 
 No more ever-deepening indentation eating the width of a narrow sidebar.
