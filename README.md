@@ -76,7 +76,7 @@ Colours are always layered translucently over your theme's own background; foreg
 
 ## How it works
 
-Folder Nav replaces the *view* inside the existing file-explorer leaf rather than disabling Obsidian's core file-explorer plugin. Disabling that plugin would also remove the sidebar's ribbon icon and break `revealInFolder`, which Obsidian's own "Reveal file in navigation" command and other plugins call into.
+Folder Nav replaces the *view* inside the existing file-explorer leaf rather than disabling Obsidian's core file-explorer plugin. Disabling that plugin would also remove the sidebar's ribbon icon, and reaching for it would mean touching undocumented APIs. Everything here goes through the public workspace API — the plugin makes no use of `app.internalPlugins` or any other private surface.
 
 The replacement is re-applied on `layout-change`, so the built-in plugin recreating its leaf (on layout restore, or when you run "Open file explorer") doesn't leave you with a native tree. Duplicate drill-down leaves are collapsed down to one.
 
@@ -87,7 +87,8 @@ Nothing in your vault configuration is rewritten. `workspace.json` and `core-plu
 - **No drag-and-drop to move files.** Obsidian's native drag handling is bound to its own explorer internals; reusing it is fragile across versions. Use the context menu's "Move file to…" instead.
 - **No inline rename (F2) or multi-select.** Same reason — use the context menu.
 - **Custom folder order isn't reproduced.** Sorting is computed from your chosen order rather than borrowed from the built-in explorer, which is destroyed on takeover. Folders you manually reordered with another plugin will sort by name or date instead.
-- **Uses undocumented APIs.** Taking over the file list relies on `app.internalPlugins`, which Obsidian doesn't guarantee. A major app update may require fixes. The failure mode is designed to be safe: if the takeover can't run, you get the native file list back.
+- **Obsidian's own "Reveal file in navigation" does nothing while the takeover is on.** It targets the built-in explorer's view, which is no longer loaded, so it quietly no-ops — it won't open a second file list or throw. Use **Folder Nav: Reveal current file in list** instead, and rebind your hotkey to it if you had one on the built-in command.
+- **A major Obsidian update may still require fixes.** The takeover is built on the public workspace API, but it does replace a core view, which no API promises to keep working. The failure mode is safe by design: if the takeover can't run, you get the native file list back.
 - **Desktop and mobile.** `isDesktopOnly` is off, but the drill-down layout has mainly been exercised on desktop.
 
 ## Development

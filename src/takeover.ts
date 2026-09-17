@@ -1,16 +1,12 @@
-import { EventRef, TAbstractFile, WorkspaceLeaf } from "obsidian";
+import { App, EventRef, WorkspaceLeaf } from "obsidian";
 import type FolderNavPlugin from "./main";
 import { VIEW_TYPE } from "./view";
 
 const NATIVE_VIEW = "file-explorer";
 
-/**
- * `WorkspaceLeaf.containerEl` exists at runtime but is newer than the typings
- * version we pin, so reach for it structurally rather than bumping the floor.
- */
-function isInLeftSidebar(leaf: WorkspaceLeaf): boolean {
-  const el = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
-  return !!el?.closest(".mod-left-split");
+/** A leaf is "in the sidebar" when its root split is the left one. */
+function isInLeftSidebar(app: App, leaf: WorkspaceLeaf): boolean {
+  return leaf.getRoot() === app.workspace.leftSplit;
 }
 
 interface NativeExplorerState {
@@ -22,16 +18,15 @@ interface NativeExplorerState {
  * Swaps the built-in explorer's view for ours, in the same leaf.
  *
  * We replace the leaf's view state rather than disabling the internal
- * `file-explorer` plugin. Disabling that plugin would also remove the sidebar's
- * ribbon icon and break `revealInFolder`, which both Obsidian's own
- * "Reveal file in navigation" command and other plugins call into.
+ * `file-explorer` plugin. Disabling it would also remove the sidebar's ribbon
+ * icon, and reaching for it would mean touching undocumented APIs — everything
+ * here goes through the public workspace API instead.
  */
 export class FileExplorerTakeover {
   private plugin: FolderNavPlugin;
   private refs: EventRef[] = [];
   private active = false;
   private busy = false;
-  private originalRevealInFolder: ((file: TAbstractFile) => void) | null = null;
 
   constructor(plugin: FolderNavPlugin) {
     this.plugin = plugin;
@@ -41,7 +36,6 @@ export class FileExplorerTakeover {
     if (this.active) return;
     this.active = true;
     this.snapshotNativeSettings();
-    this.patchRevealInFolder();
     this.refs.push(this.plugin.app.workspace.on("layout-change", () => void this.takeOver()));
     void this.takeOver();
   }
@@ -63,7 +57,6 @@ export class FileExplorerTakeover {
   private release(): void {
     for (const ref of this.refs) this.plugin.app.workspace.offref(ref);
     this.refs = [];
-    this.unpatchRevealInFolder();
   }
 
   /**
@@ -96,7 +89,8 @@ export class FileExplorerTakeover {
     const leaves = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE);
     if (leaves.length <= 1) return;
 
-    const keep = leaves.find((leaf) => isInLeftSidebar(leaf)) ?? leaves[0];
+    const keep =
+      leaves.find((leaf) => isInLeftSidebar(this.plugin.app, leaf)) ?? leaves[0];
     for (const leaf of leaves) {
       if (leaf !== keep) leaf.detach();
     }
@@ -124,52 +118,4 @@ export class FileExplorerTakeover {
     void this.plugin.saveSettings();
   }
 
-  // ------------------------------------------------------------- reveal bridge
-
-  /**
-   * `revealInFolder` is an undocumented internal API, so everything here is
-   * best-effort: if the shape is not what we expect we simply leave it alone and
-   * the native command becomes a no-op while our view is in charge.
-   */
-  private patchRevealInFolder(): void {
-    const instance = this.explorerInstance();
-    if (!instance || typeof instance.revealInFolder !== "function") return;
-    if (this.originalRevealInFolder) return;
-
-    const original = instance.revealInFolder.bind(instance);
-    this.originalRevealInFolder = original;
-
-    instance.revealInFolder = (file: TAbstractFile) => {
-      const view = this.plugin.getView();
-      if (view) {
-        view.revealFile(file);
-        return;
-      }
-      try {
-        original(file);
-      } catch {
-        // The native view is gone; nothing sensible left to delegate to.
-      }
-    };
-  }
-
-  private unpatchRevealInFolder(): void {
-    const instance = this.explorerInstance();
-    if (instance && this.originalRevealInFolder) {
-      instance.revealInFolder = this.originalRevealInFolder;
-    }
-    this.originalRevealInFolder = null;
-  }
-
-  private explorerInstance(): { revealInFolder?: (file: TAbstractFile) => void } | null {
-    const internalPlugins = (
-      this.plugin.app as unknown as {
-        internalPlugins?: {
-          getPluginById(id: string): { instance?: unknown } | null;
-        };
-      }
-    ).internalPlugins;
-    const instance = internalPlugins?.getPluginById(NATIVE_VIEW)?.instance;
-    return (instance as { revealInFolder?: (file: TAbstractFile) => void }) ?? null;
-  }
 }
