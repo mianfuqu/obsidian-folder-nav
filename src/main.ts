@@ -82,6 +82,7 @@ export default class FolderNavPlugin extends Plugin {
           item
             .setTitle("文件夹颜色")
             .setIcon("palette")
+            .setSection("action")
             .onClick(() => new ColorPickerModal(this.app, this, file.path).open())
         );
       })
