@@ -170,3 +170,117 @@
   font-size: var(--font-ui-small);
   color: var(--text-faint);
 }
+
+/* ------------------------------------------------------------------ colours */
+
+/* Wash applied to the whole view while standing in a coloured folder.
+   --fn-wash is set inline by the view; absent means no tint. */
+.folder-nav.has-wash {
+  background-color: var(--fn-wash);
+}
+
+.folder-nav-row.has-tint {
+  background-color: var(--fn-tint);
+}
+
+/* background-image paints over background-color, so hover and selection layer
+   on top of the tint instead of replacing it. background-color is restated
+   because the plain :hover rule uses the `background` shorthand, which would
+   otherwise reset the tint. */
+.folder-nav-row.has-tint:hover {
+  background-color: var(--fn-tint);
+  background-image: linear-gradient(
+    var(--nav-item-background-hover),
+    var(--nav-item-background-hover)
+  );
+}
+
+.folder-nav-row.has-tint.is-selected {
+  background-color: var(--fn-tint);
+  background-image: linear-gradient(
+    var(--nav-item-background-active),
+    var(--nav-item-background-active)
+  );
+}
+
+/* ------------------------------------------------------------- colour picker */
+
+.folder-nav-color-modal h3 {
+  margin: 0 0 2px;
+}
+
+.folder-nav-color-path {
+  margin-bottom: 14px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  word-break: break-all;
+}
+
+.folder-nav-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.folder-nav-swatches.is-compact {
+  gap: 6px;
+}
+
+.folder-nav-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-s);
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.folder-nav-swatches.is-compact .folder-nav-swatch {
+  width: 20px;
+  height: 20px;
+}
+
+.folder-nav-swatch:hover {
+  transform: scale(1.1);
+}
+
+.folder-nav-swatch.is-current {
+  border-color: var(--text-normal);
+}
+
+.folder-nav-color-recent {
+  margin-top: 18px;
+}
+
+.folder-nav-color-label {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.folder-nav-color-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* --------------------------------------------------- swatches in the settings */
+
+.folder-nav-swatch-button {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: var(--radius-s);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.folder-nav-swatch-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}

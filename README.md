@@ -47,10 +47,26 @@ Enabled by default: it takes over the built-in **Files** view. The sidebar tab i
 - `Folder Nav: Go up one level`
 - `Folder Nav: Reveal current file in list`
 
+## Folder colours
+
+Give a folder a colour and it carries into everything below it: the row is tinted where it sits, and the whole sidebar picks up a wash once you're inside. A drill-down list never shows you the parent folder, so the colour is what tells you where you are.
+
+<p align="center">
+  <img src="assets/demo-root.png" width="300" alt="Coloured folder rows">
+  <img src="assets/demo-nested.png" width="300" alt="Wash inside a coloured folder">
+</p>
+
+**Set one** — right-click a folder → **Folder colour**, then pick a swatch. A folder with no colour of its own inherits the nearest coloured ancestor, so drilling deeper keeps the cue.
+
+**Manage them** — Settings → Folder Nav → Folder colours lists every coloured folder, with a **Background intensity** slider. At `0` only the folder row is tinted and the list background is left alone.
+
+Colours are always layered translucently over your theme's own background; foreground colours are never touched, so text stays exactly as legible as your theme makes it.
+
 ## Settings
 
 | Setting | Description |
 | --- | --- |
+| **Background intensity** | How strong the wash is inside a coloured folder — the number is the opacity percentage. `0` tints the folder row only. |
 | **Take over the file list** | Turn off to restore the native tree instantly — nothing is left behind. |
 | **Sort order** | *Follow native* mirrors the sort the built-in explorer was using when Folder Nav took over (alphabetical, modified time, …). *Folders first* always puts folders above files, then sorts by name. |
 | **Reveal current file** | Follow the active note into its folder. Seeded from Obsidian's own "Auto reveal" setting. |
@@ -105,6 +121,8 @@ src/
 ├── takeover.ts   Swap the built-in explorer's view for ours, and back
 ├── breadcrumb.ts Breadcrumb trail construction
 ├── render.ts     A single list row
+├── palette.ts    Folder colour palette and nearest-ancestor lookup
+├── colorPicker.ts Colour swatch modal
 ├── sort.ts       Sorting and the vault-root filter
 └── settings.ts   Settings tab
 ```

@@ -1,7 +1,7 @@
 {
   "id": "folder-nav",
   "name": "Folder Nav",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
   "description": "Browse the sidebar one folder at a time instead of scrolling an indented tree. Click into a folder, follow the breadcrumb back.",
   "author": "mianfuqu",
