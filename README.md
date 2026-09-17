@@ -29,7 +29,9 @@ Enabled by default: it takes over the built-in **Files** view. The sidebar tab i
 | Click a file | Open it in the main editor area (never in the sidebar) |
 | Click a breadcrumb segment | Jump back to that level |
 | Click `←` | Go up one level |
-| Right-click a file or folder | The native Obsidian context menu |
+| Right-click a file or folder | **New note** / **New folder**, **Rename**, **Move to…**, **Make a copy**, **Delete** — plus other plugins' menu items |
+
+> Obsidian adds its core context-menu items inside the file explorer's own code, *before* it fires the `file-menu` event — so a plugin listening to that event only ever sees third-party contributions. Since Folder Nav replaces that view, it rebuilds the core items itself on public API. **Delete** in particular hands off to Obsidian's own `promptForDeletion`, so your "confirm before deleting" setting is respected.
 
 **Keyboard** (click the list first)
 
@@ -84,8 +86,8 @@ Nothing in your vault configuration is rewritten. `workspace.json` and `core-plu
 
 ## Limitations
 
-- **No drag-and-drop to move files.** Obsidian's native drag handling is bound to its own explorer internals; reusing it is fragile across versions. Use the context menu's "Move file to…" instead.
-- **No inline rename (F2) or multi-select.** Same reason — use the context menu.
+- **No drag-and-drop to move files.** Obsidian's native drag handling is bound to its own explorer internals; reusing it means depending on undocumented APIs. Use the context menu's **Move to…** instead, which opens a folder picker.
+- **No inline rename (F2) and no multi-select.** **Rename** lives in the context menu and opens a small dialog. Select one file at a time.
 - **Custom folder order isn't reproduced.** Sorting is computed from your chosen order rather than borrowed from the built-in explorer, which is destroyed on takeover. Folders you manually reordered with another plugin will sort by name or date instead.
 - **Obsidian's own "Reveal file in navigation" does nothing while the takeover is on.** It targets the built-in explorer's view, which is no longer loaded, so it quietly no-ops — it won't open a second file list or throw. Use **Folder Nav: Reveal current file in list** instead, and rebind your hotkey to it if you had one on the built-in command.
 - **A major Obsidian update may still require fixes.** The takeover is built on the public workspace API, but it does replace a core view, which no API promises to keep working. The failure mode is safe by design: if the takeover can't run, you get the native file list back.

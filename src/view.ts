@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 import type FolderNavPlugin from "./main";
 import { buildCrumbs } from "./breadcrumb";
+import { addCoreFileMenuItems } from "./fileActions";
 import { ROW_TINT_ALPHA, resolveColorId, tintOf } from "./palette";
 import { createRow } from "./render";
 import { applyRootFilter, sortChildren } from "./sort";
@@ -339,7 +340,11 @@ export class FolderNavView extends ItemView {
 
   private showMenu(event: MouseEvent, file: TAbstractFile): void {
     const menu = new Menu();
-    // Fires the native menu, so rename/delete/move/bookmark all keep working.
+    // Obsidian's own explorer adds its core items to the menu *before* firing
+    // `file-menu`, so the event on its own only carries third-party
+    // contributions — no New note, Rename or Delete. Rebuild those, then let
+    // other plugins (and our colour picker) add theirs on top.
+    addCoreFileMenuItems(this.plugin.app, menu, file);
     this.plugin.app.workspace.trigger("file-menu", menu, file, VIEW_TYPE, this.leaf);
     menu.showAtMouseEvent(event);
   }
