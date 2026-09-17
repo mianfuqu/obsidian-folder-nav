@@ -1,7 +1,8 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, TFolder } from "obsidian";
 import { FolderNavView, VIEW_TYPE } from "./view";
 import { DEFAULT_SETTINGS, FolderNavSettings, FolderNavSettingTab } from "./settings";
 import { FileExplorerTakeover } from "./takeover";
+import { ColorPickerModal } from "./colorPicker";
 
 export default class FolderNavPlugin extends Plugin {
   settings!: FolderNavSettings;
@@ -58,7 +59,98 @@ export default class FolderNavPlugin extends Plugin {
       },
     });
 
+    this.registerFileMenu();
+    this.registerColorMaintenance();
+
     this.app.workspace.onLayoutReady(() => this.applyEnabledState());
+  }
+
+  /**
+   * Adds the colour picker to the file context menu.
+   *
+   * `source` must be checked: FolderNavView's own context menu goes through the
+   * native `file-menu` event, so without this the item would also appear in the
+   * built-in explorer's menu after the takeover is switched off — where it would
+   * do nothing visible.
+   */
+  private registerFileMenu(): void {
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file, source) => {
+        if (source !== VIEW_TYPE) return;
+        if (!(file instanceof TFolder)) return;
+        menu.addItem((item) =>
+          item
+            .setTitle("文件夹颜色")
+            .setIcon("palette")
+            .onClick(() => new ColorPickerModal(this.app, this, file.path).open())
+        );
+      })
+    );
+  }
+
+  /**
+   * Colours are keyed by path, so renames and deletions have to follow them.
+   * This lives on the plugin rather than the view: the colour map is plugin
+   * state and must stay correct even when no view is open.
+   */
+  private registerColorMaintenance(): void {
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        const colors = this.settings.folderColors;
+        let changed = false;
+        for (const key of Object.keys(colors)) {
+          if (key === oldPath || key.startsWith(`${oldPath}/`)) {
+            colors[file.path + key.slice(oldPath.length)] = colors[key];
+            delete colors[key];
+            changed = true;
+          }
+        }
+        if (changed) void this.persistColorChange();
+      })
+    );
+
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        const colors = this.settings.folderColors;
+        let changed = false;
+        for (const key of Object.keys(colors)) {
+          if (key === file.path || key.startsWith(`${file.path}/`)) {
+            delete colors[key];
+            changed = true;
+          }
+        }
+        if (changed) void this.persistColorChange();
+      })
+    );
+  }
+
+  private async persistColorChange(): Promise<void> {
+    await this.saveSettings();
+    this.refreshViews();
+  }
+
+  /**
+   * Assigns or clears a folder colour. Passing null removes it.
+   * The picker modal and the settings tab both go through here, and it doubles
+   * as the entry point for verifying colours without driving the native menu,
+   * which cannot be exercised programmatically.
+   */
+  async setFolderColor(path: string, colorId: string | null): Promise<void> {
+    if (colorId) {
+      this.settings.folderColors[path] = colorId;
+      this.settings.recentColors = [
+        colorId,
+        ...this.settings.recentColors.filter((id) => id !== colorId),
+      ].slice(0, 6);
+    } else {
+      delete this.settings.folderColors[path];
+    }
+    await this.persistColorChange();
+  }
+
+  async clearAllFolderColors(): Promise<void> {
+    this.settings.folderColors = {};
+    await this.persistColorChange();
   }
 
   onunload(): void {
@@ -84,7 +176,13 @@ export default class FolderNavPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const stored = ((await this.loadData()) ?? {}) as Partial<FolderNavSettings>;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
+    // Object.assign is shallow: without these two lines the settings object
+    // would share its containers with DEFAULT_SETTINGS, and assigning a colour
+    // would mutate the defaults themselves for the rest of the session.
+    this.settings.folderColors = { ...(stored.folderColors ?? {}) };
+    this.settings.recentColors = [...(stored.recentColors ?? [])];
   }
 
   async saveSettings(): Promise<void> {

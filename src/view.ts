@@ -9,6 +9,7 @@ import {
 } from "obsidian";
 import type FolderNavPlugin from "./main";
 import { buildCrumbs } from "./breadcrumb";
+import { ROW_TINT_ALPHA, resolveColorId, tintOf } from "./palette";
 import { createRow } from "./render";
 import { applyRootFilter, sortChildren } from "./sort";
 
@@ -169,7 +170,32 @@ export class FolderNavView extends ItemView {
   render(): void {
     this.renderBreadcrumb();
     this.renderList();
+    this.applyWash();
     this.backEl.toggleClass("is-disabled", this.historyIndex <= 0);
+  }
+
+  /**
+   * Tints the whole view while standing inside a coloured folder — including
+   * an inherited colour from a parent, so the cue survives drilling down.
+   */
+  private applyWash(): void {
+    const { folderColors, colorWash } = this.plugin.settings;
+    const colorId = resolveColorId(folderColors, this.currentPath);
+    const wash = colorId && colorWash > 0 ? tintOf(colorId, colorWash / 100) : null;
+
+    this.contentEl.toggleClass("has-wash", wash !== null);
+    if (wash) this.contentEl.style.setProperty("--fn-wash", wash);
+    else this.contentEl.style.removeProperty("--fn-wash");
+  }
+
+  /**
+   * Only folders carry a colour, and only one assigned to them directly —
+   * an inherited colour belongs to the wash, not to the row.
+   */
+  private tintFor(file: TAbstractFile): string | null {
+    if (!(file instanceof TFolder)) return null;
+    const colorId = this.plugin.settings.folderColors[file.path];
+    return colorId ? tintOf(colorId, ROW_TINT_ALPHA) : null;
   }
 
   private currentFolder(): TFolder {
@@ -225,6 +251,7 @@ export class FolderNavView extends ItemView {
     for (const child of children) {
       const row = createRow(child, {
         showExtensions: settings.showExtensions,
+        tintFor: (file) => this.tintFor(file),
         onOpen: (file) => this.openEntry(file),
         onContextMenu: (event, file) => this.showMenu(event, file),
       });

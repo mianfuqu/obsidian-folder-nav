@@ -41,6 +41,8 @@ function displayName(file: TAbstractFile, showExtensions: boolean): string {
 
 export interface RowHandlers {
   showExtensions: boolean;
+  /** A translucent background colour for this row, or null for none. */
+  tintFor: (file: TAbstractFile) => string | null;
   onOpen: (file: TAbstractFile) => void;
   onContextMenu: (event: MouseEvent, file: TAbstractFile) => void;
 }
@@ -53,6 +55,12 @@ export function createRow(file: TAbstractFile, handlers: RowHandlers): HTMLEleme
   row.addClass(isFolder ? "is-folder" : "is-file");
   row.dataset.path = file.path;
   row.tabIndex = -1;
+
+  const tint = handlers.tintFor(file);
+  if (tint) {
+    row.addClass("has-tint");
+    row.style.setProperty("--fn-tint", tint);
+  }
 
   const icon = row.createSpan({ cls: "folder-nav-row-icon" });
   setIcon(icon, iconFor(file));

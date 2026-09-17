@@ -1,5 +1,6 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type FolderNavPlugin from "./main";
+import { PALETTE, paletteColor } from "./palette";
 
 /**
  * Sorting is done by us rather than by the built-in explorer, because taking
@@ -22,6 +23,15 @@ export interface FolderNavSettings {
   hideRootFiles: boolean;
   /** Comma-separated extensions hidden by `hideRootFiles`. */
   hiddenExtensions: string;
+  /** Folder path -> palette colour id. The vault root is "". */
+  folderColors: Record<string, string>;
+  /** Recently used colour ids, newest first, for the picker's shortcut row. */
+  recentColors: string[];
+  /**
+   * Opacity of the wash applied to the whole list inside a coloured folder,
+   * as a percentage. 0 colours the folder row only and leaves the list alone.
+   */
+  colorWash: number;
 }
 
 export const DEFAULT_SETTINGS: FolderNavSettings = {
@@ -32,6 +42,9 @@ export const DEFAULT_SETTINGS: FolderNavSettings = {
   showExtensions: true,
   hideRootFiles: false,
   hiddenExtensions: "png,jpg,jpeg,gif,webp,svg,bmp",
+  folderColors: {},
+  recentColors: [],
+  colorWash: 14,
 };
 
 export class FolderNavSettingTab extends PluginSettingTab {
@@ -125,5 +138,100 @@ export class FolderNavSettingTab extends PluginSettingTab {
             this.plugin.refreshViews();
           })
       );
+
+    // -------------------------------------------------------------- 文件夹颜色
+
+    new Setting(containerEl).setName("文件夹颜色").setHeading();
+
+    new Setting(containerEl)
+      .setName("背景染色强度")
+      .setDesc(
+        "进入已上色的文件夹时整个列表背景的染色浓度(数值就是透明度百分比)。设为 0 则只染文件夹那一行,不染背景。子文件夹会自动继承最近的上级颜色。"
+      )
+      .addSlider((slider) =>
+        slider
+          .setLimits(0, 50, 1)
+          .setValue(this.plugin.settings.colorWash)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.colorWash = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshViews();
+          })
+      );
+
+    this.renderColorList(containerEl);
+
+    let newPath = "";
+    new Setting(containerEl)
+      .setName("手动指定文件夹")
+      .setDesc("填相对库根目录的路径,再点下面的色块。右键文件夹也能设置。")
+      .addText((text) =>
+        text.setPlaceholder("例如:药理学/第一章").onChange((value) => {
+          newPath = value.trim();
+        })
+      );
+
+    const picker = new Setting(containerEl).setName("选一个颜色");
+    for (const color of PALETTE) {
+      picker.addButton((button) => {
+        button.buttonEl.addClass("folder-nav-swatch-button");
+        button.buttonEl.style.backgroundColor = color.hex;
+        button.setTooltip(color.label);
+        button.onClick(async () => {
+          if (!newPath) {
+            new Notice("先在左边填文件夹路径");
+            return;
+          }
+          await this.plugin.setFolderColor(newPath, color.id);
+          this.display();
+        });
+      });
+    }
+  }
+
+  private renderColorList(containerEl: HTMLElement): void {
+    const entries = Object.entries(this.plugin.settings.folderColors).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
+
+    if (entries.length === 0) {
+      new Setting(containerEl)
+        .setName("已上色的文件夹")
+        .setDesc("还没有。右键任意文件夹即可上色。");
+      return;
+    }
+
+    new Setting(containerEl)
+      .setName(`已上色的文件夹(${entries.length})`)
+      .addExtraButton((button) =>
+        button
+          .setIcon("trash-2")
+          .setTooltip("全部清除")
+          .onClick(async () => {
+            await this.plugin.clearAllFolderColors();
+            this.display();
+          })
+      );
+
+    for (const [path, colorId] of entries) {
+      const color = paletteColor(colorId);
+      const setting = new Setting(containerEl).setName(path || "(库根目录)");
+
+      const dot = document.createElement("span");
+      dot.addClass("folder-nav-swatch-dot");
+      if (color) dot.style.backgroundColor = color.hex;
+      setting.nameEl.prepend(dot);
+
+      setting.addExtraButton((button) =>
+        button
+          .setIcon("x")
+          .setTooltip("清除颜色")
+          .onClick(async () => {
+            await this.plugin.setFolderColor(path, null);
+            this.display();
+          })
+      );
+    }
   }
 }
