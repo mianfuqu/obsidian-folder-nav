@@ -130,6 +130,13 @@ src/
 └── settings.ts   Settings tab
 ```
 
+## Contributors
+
+- **mianfuqu** — author and maintainer
+- **[DeepSeek](https://www.deepseek.com/)** — implementation
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
 ## License
 
 MIT

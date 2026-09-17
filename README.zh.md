@@ -130,6 +130,13 @@ src/
 └── settings.ts   设置页
 ```
 
+## 贡献者
+
+- **mianfuqu** —— 作者与维护者
+- **[DeepSeek](https://www.deepseek.com/)** —— 实现
+
+详见 [CONTRIBUTORS.md](CONTRIBUTORS.md)。
+
 ## 许可证
 
 MIT
