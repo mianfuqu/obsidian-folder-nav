@@ -50,8 +50,7 @@ export interface RowHandlers {
 export function createRow(file: TAbstractFile, handlers: RowHandlers): HTMLElement {
   const isFolder = file instanceof TFolder;
 
-  const row = document.createElement("div");
-  row.addClass("folder-nav-row");
+  const row = createDiv({ cls: "folder-nav-row" });
   row.addClass(isFolder ? "is-folder" : "is-file");
   row.dataset.path = file.path;
   row.tabIndex = -1;

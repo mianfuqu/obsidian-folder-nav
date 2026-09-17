@@ -27,7 +27,7 @@ export class ColorPickerModal extends Modal {
 
     const grid = contentEl.createDiv({ cls: "folder-nav-swatches" });
     for (const color of PALETTE) {
-      this.swatch(grid, color, color.id === current, () => this.apply(color.id));
+      this.swatch(grid, color, color.id === current, () => void this.apply(color.id));
     }
 
     const recent = this.plugin.settings.recentColors
@@ -41,7 +41,7 @@ export class ColorPickerModal extends Modal {
       section.createDiv({ cls: "folder-nav-color-label", text: "最近用过" });
       const row = section.createDiv({ cls: "folder-nav-swatches is-compact" });
       for (const color of recent) {
-        this.swatch(row, color, false, () => this.apply(color.id));
+        this.swatch(row, color, false, () => void this.apply(color.id));
       }
     }
 

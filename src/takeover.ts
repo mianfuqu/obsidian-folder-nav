@@ -71,8 +71,9 @@ export class FileExplorerTakeover {
     try {
       const workspace = this.plugin.app.workspace;
       for (const leaf of workspace.getLeavesOfType(NATIVE_VIEW)) {
-        const wasActive = workspace.activeLeaf === leaf;
-        await leaf.setViewState({ type: VIEW_TYPE, active: wasActive });
+        // active: false — re-applying the takeover must never pull focus away
+        // from the editor.
+        await leaf.setViewState({ type: VIEW_TYPE, active: false });
       }
       this.consolidate();
     } finally {
