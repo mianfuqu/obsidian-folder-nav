@@ -247,7 +247,7 @@ export class FolderNavView extends ItemView {
     }
     this.emptyEl.hide();
 
-    const fragment = document.createDocumentFragment();
+    const fragment = createFragment();
     for (const child of children) {
       const row = createRow(child, {
         showExtensions: settings.showExtensions,

@@ -127,10 +127,10 @@ export class FolderNavSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("隐藏的扩展名")
-      .setDesc("逗号分隔,配合上一项使用。例如:png, jpg, pdf")
+      .setDesc("逗号分隔,配合上一项使用。例如:PNG, JPG, PDF")
       .addText((text) =>
         text
-          .setPlaceholder("png,jpg,jpeg,gif,webp,svg,bmp")
+          .setPlaceholder("PNG,JPG,JPEG,GIF,webp,SVG,bmp")
           .setValue(this.plugin.settings.hiddenExtensions)
           .onChange(async (value) => {
             this.plugin.settings.hiddenExtensions = value;
@@ -152,7 +152,6 @@ export class FolderNavSettingTab extends PluginSettingTab {
         slider
           .setLimits(0, 50, 1)
           .setValue(this.plugin.settings.colorWash)
-          .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.colorWash = value;
             await this.plugin.saveSettings();
@@ -218,8 +217,7 @@ export class FolderNavSettingTab extends PluginSettingTab {
       const color = paletteColor(colorId);
       const setting = new Setting(containerEl).setName(path || "(库根目录)");
 
-      const dot = document.createElement("span");
-      dot.addClass("folder-nav-swatch-dot");
+      const dot = createSpan({ cls: "folder-nav-swatch-dot" });
       if (color) dot.style.backgroundColor = color.hex;
       setting.nameEl.prepend(dot);
 
