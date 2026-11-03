@@ -96,16 +96,33 @@ Nothing in your vault configuration is rewritten. `workspace.json` and `core-plu
 ## Development
 
 ```bash
-npm install
+npm ci
+npm run check     # TypeScript typecheck
+npm test          # Node's built-in regression tests
 npm run build     # typecheck + bundle
 npm run dev       # watch mode
 ```
+
+Development requires Node.js 18 or newer. The toolchain has three direct
+dependencies: TypeScript, esbuild, and the official Obsidian API types. ESLint
+and its Obsidian rules are no longer installed; type checking and behavior tests
+are separate checks. The shipped plugin only imports Obsidian at runtime.
+
+The list reuses existing rows and SVG icons, delegates row events to the view,
+and batches vault events into one refresh per animation frame. Keyboard
+selection updates only the old and new rows. Root-file filtering runs before
+sorting and reuses its parsed extension list. Tests cover DOM allocations and
+event bursts using a DOM double, plus actual production and watch builds;
+they do not measure browser layout or replace testing in Obsidian.
 
 `main.js` is written to the project root. To also copy it into a vault while developing:
 
 ```bash
 OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
 ```
+
+Watch mode copies each successful rebuild to that directory too. Production
+builds omit timestamps so unchanged sources produce identical bundles.
 
 Debug loop, if you have the Obsidian CLI:
 
@@ -115,6 +132,26 @@ obsidian vault=MyVault dev:errors
 obsidian vault=MyVault dev:screenshot path=/tmp/shot.png
 ```
 
+### Automated GitHub releases
+
+Commit the `.github/` directory and these changes to the repository. Increasing
+`manifest.json`'s `version` and pushing to the default branch runs the
+`Release Obsidian plugin` workflow: locked install, regression tests, build,
+then a matching tag and Release, such as `0.2.4` without a `v` prefix.
+Description-only edits skip publishing; version downgrades fail. The plugin's
+manifest is the version source, independent of `package.json`.
+
+Each Release includes `main.js`, `manifest.json`, `styles.css`, an installable
+`folder-nav-VERSION.zip`, and `SHA256SUMS.txt`. Assets upload to a draft before
+publication. Rerunning does not replace a published Release. A manual run from
+Actions can publish the current version on the default branch.
+
+The workflow uses the built-in `GITHUB_TOKEN`; no personal token is needed.
+Enable Actions and allow the workflow's `contents: write` permission under
+your repository or organization policies. Add each new plugin version and its
+minimum Obsidian version to `versions.json` so older clients can find compatible
+historical releases.
+
 ### Source layout
 
 ```
@@ -123,6 +160,8 @@ src/
 ├── view.ts       FolderNavView — navigation state, history, list rendering
 ├── takeover.ts   Swap the built-in explorer's view for ours, and back
 ├── breadcrumb.ts Breadcrumb trail construction
+├── config.ts     Validated settings and defaults
+├── paths.ts      Path boundaries and rename rebasing
 ├── render.ts     A single list row
 ├── palette.ts    Folder colour palette and nearest-ancestor lookup
 ├── colorPicker.ts Colour swatch modal

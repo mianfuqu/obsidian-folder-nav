@@ -1,51 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type FolderNavPlugin from "./main";
 import { PALETTE, paletteColor } from "./palette";
-
-/**
- * Sorting is done by us rather than by the built-in explorer, because taking
- * over the explorer's leaf destroys the view we would have borrowed the sort
- * from. `nativeSortOrder` mirrors whatever the native explorer was set to at
- * the moment we took over, so the list looks the same as before.
- */
-export type SortMode = "folders-first" | "native";
-
-export interface FolderNavSettings {
-  /** Replace the built-in file list with the drill-down view. */
-  enabled: boolean;
-  sortMode: SortMode;
-  /** Mirrors the native explorer's sortOrder, e.g. "alphabetical". */
-  nativeSortOrder: string;
-  /** Follow the active file into its folder. Seeded from the native setting. */
-  autoReveal: boolean;
-  showExtensions: boolean;
-  /** Hide loose files sitting in the vault root — handy for attachment clutter. */
-  hideRootFiles: boolean;
-  /** Comma-separated extensions hidden by `hideRootFiles`. */
-  hiddenExtensions: string;
-  /** Folder path -> palette colour id. The vault root is "". */
-  folderColors: Record<string, string>;
-  /** Recently used colour ids, newest first, for the picker's shortcut row. */
-  recentColors: string[];
-  /**
-   * Opacity of the wash applied to the whole list inside a coloured folder,
-   * as a percentage. 0 colours the folder row only and leaves the list alone.
-   */
-  colorWash: number;
-}
-
-export const DEFAULT_SETTINGS: FolderNavSettings = {
-  enabled: true,
-  sortMode: "native",
-  nativeSortOrder: "alphabetical",
-  autoReveal: false,
-  showExtensions: true,
-  hideRootFiles: false,
-  hiddenExtensions: "png,jpg,jpeg,gif,webp,svg,bmp",
-  folderColors: {},
-  recentColors: [],
-  colorWash: 14,
-};
+import type { SortMode } from "./config";
 
 export class FolderNavSettingTab extends PluginSettingTab {
   plugin: FolderNavPlugin;

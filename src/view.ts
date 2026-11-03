@@ -11,8 +11,9 @@ import type FolderNavPlugin from "./main";
 import { buildCrumbs } from "./breadcrumb";
 import { addCoreFileMenuItems } from "./fileActions";
 import { ROW_TINT_ALPHA, resolveColorId, tintOf } from "./palette";
-import { createRow } from "./render";
+import { createRow, RenderedRow, updateRow } from "./render";
 import { applyRootFilter, sortChildren } from "./sort";
+import { isWithin, parentPath, rebasePath } from "./paths";
 
 export const VIEW_TYPE = "folder-nav-view";
 
@@ -31,7 +32,14 @@ export class FolderNavView extends ItemView {
   private crumbEl!: HTMLElement;
   private listEl!: HTMLElement;
   private emptyEl!: HTMLElement;
-  private rowEls = new Map<string, HTMLElement>();
+  private rows = new Map<string, RenderedRow>();
+  private orderedPaths: string[] = [];
+  private rowIndexes = new Map<string, number>();
+  private frame: number | null = null;
+  private viewWindow!: Window;
+  private opened = false;
+  private crumbPath: string | null = null;
+  private crumbVaultName: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: FolderNavPlugin) {
     super(leaf);
@@ -53,6 +61,8 @@ export class FolderNavView extends ItemView {
 
   async onOpen(): Promise<void> {
     const root = this.contentEl;
+    this.viewWindow = root.ownerDocument.defaultView ?? window;
+    this.opened = true;
     root.empty();
     root.addClass("folder-nav");
 
@@ -71,6 +81,10 @@ export class FolderNavView extends ItemView {
     this.emptyEl.hide();
 
     this.registerDomEvent(this.backEl, "click", () => this.goBack());
+    this.registerDomEvent(this.listEl, "click", (evt) => {
+      const file = this.fileAtEvent(evt);
+      if (file) this.openEntry(file);
+    });
     // One handler on the container: row keydowns bubble up to it.
     this.registerDomEvent(this.containerEl, "keydown", (evt) => this.onKeyDown(evt));
     this.registerDomEvent(this.containerEl, "contextmenu", (evt) =>
@@ -86,6 +100,11 @@ export class FolderNavView extends ItemView {
     this.registerEvent(
       this.plugin.app.vault.on("rename", (file, oldPath) => this.onRenamed(file, oldPath))
     );
+    this.registerEvent(this.plugin.app.vault.on("modify", (file) => {
+      if (this.plugin.settings.sortMode === "native" &&
+          this.plugin.settings.nativeSortOrder.startsWith("by-modified-time") &&
+          this.parentPathOf(file) === this.currentPath) this.refresh();
+    }));
     this.registerEvent(
       this.plugin.app.workspace.on("file-open", (file) => this.onFileOpen(file))
     );
@@ -95,7 +114,13 @@ export class FolderNavView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    this.rowEls.clear();
+    this.opened = false;
+    this.cancelRefresh();
+    this.rows.clear();
+    this.rowIndexes.clear();
+    this.orderedPaths = [];
+    this.crumbPath = null;
+    this.crumbVaultName = null;
     this.contentEl.empty();
   }
 
@@ -111,7 +136,7 @@ export class FolderNavView extends ItemView {
       }
     }
     this.currentPath = target;
-    this.selectedPath = null;
+    this.select(null, false);
     this.render();
     this.focusIfEngaged();
   }
@@ -119,18 +144,18 @@ export class FolderNavView extends ItemView {
   /** Falls back to the nearest surviving ancestor if `path` no longer exists. */
   private normalize(path: string): string {
     const vault = this.plugin.app.vault;
-    if (path === ROOT || vault.getAbstractFileByPath(path) instanceof TFolder) return path;
-
-    const slash = path.lastIndexOf("/");
-    const parent = slash === -1 ? ROOT : path.slice(0, slash);
-    return vault.getAbstractFileByPath(parent) instanceof TFolder ? parent : ROOT;
+    while (path !== ROOT && !(vault.getAbstractFileByPath(path) instanceof TFolder)) {
+      path = parentPath(path);
+    }
+    return path;
   }
 
   goBack(): void {
     if (this.historyIndex <= 0) return;
     this.historyIndex -= 1;
-    this.currentPath = this.history[this.historyIndex];
-    this.selectedPath = null;
+    this.currentPath = this.normalize(this.history[this.historyIndex]);
+    this.history[this.historyIndex] = this.currentPath;
+    this.select(null, false);
     this.render();
     this.focusIfEngaged();
   }
@@ -140,7 +165,7 @@ export class FolderNavView extends ItemView {
    * reveal, and stealing focus from the editor mid-typing would be hostile.
    */
   private focusIfEngaged(): void {
-    if (this.containerEl.contains(document.activeElement)) this.listEl.focus();
+    if (this.containerEl.contains(this.contentEl.ownerDocument.activeElement)) this.listEl.focus();
   }
 
   goUp(): void {
@@ -165,10 +190,22 @@ export class FolderNavView extends ItemView {
 
   /** Public hook so the plugin can re-render every open view after a setting change. */
   refresh(): void {
-    this.render();
+    if (!this.opened || this.frame !== null) return;
+    // Vault imports and setting changes can emit many events in one frame.
+    this.frame = this.viewWindow.requestAnimationFrame(() => {
+      this.frame = null;
+      if (this.opened) this.render();
+    });
+  }
+
+  private cancelRefresh(): void {
+    if (this.frame === null) return;
+    this.viewWindow.cancelAnimationFrame(this.frame);
+    this.frame = null;
   }
 
   render(): void {
+    this.cancelRefresh();
     this.renderBreadcrumb();
     this.renderList();
     this.applyWash();
@@ -205,8 +242,12 @@ export class FolderNavView extends ItemView {
   }
 
   private renderBreadcrumb(): void {
+    const vaultName = this.plugin.app.vault.getName();
+    if (this.crumbPath === this.currentPath && this.crumbVaultName === vaultName) return;
+    this.crumbPath = this.currentPath;
+    this.crumbVaultName = vaultName;
     this.crumbEl.empty();
-    const crumbs = buildCrumbs(this.plugin.app.vault.getName(), this.currentPath);
+    const crumbs = buildCrumbs(vaultName, this.currentPath);
 
     crumbs.forEach((crumb, index) => {
       const isLast = index === crumbs.length - 1;
@@ -224,18 +265,52 @@ export class FolderNavView extends ItemView {
   }
 
   private renderList(): void {
-    const hadFocus = this.containerEl.contains(document.activeElement);
-
-    this.listEl.empty();
-    this.rowEls.clear();
-
     const isRoot = this.currentPath === ROOT;
     const settings = this.plugin.settings;
-    const children = applyRootFilter(
-      sortChildren(this.currentFolder().children ?? [], settings),
-      isRoot,
-      settings
+    const children = sortChildren(
+      applyRootFilter(this.currentFolder().children, isRoot, settings), settings
     );
+    const visible = new Set(children.map((file) => file.path));
+    for (const [path, row] of this.rows) {
+      if (!visible.has(path)) row.el.remove();
+    }
+    const nextRows = new Map<string, RenderedRow>();
+    this.orderedPaths = [];
+    this.rowIndexes.clear();
+    let cursor = this.listEl.firstElementChild;
+    let additions: DocumentFragment | null = null;
+    for (const file of children) {
+      const options = { showExtensions: settings.showExtensions, tint: this.tintFor(file) };
+      let row = this.rows.get(file.path);
+      // Delete/create can replace a file with a folder at the same path before
+      // the scheduled frame runs. Its structure must then be recreated.
+      if (row && row.isFolder !== (file instanceof TFolder)) {
+        if (row.el === cursor) cursor = cursor.nextElementSibling;
+        row.el.remove();
+        row = undefined;
+      }
+      if (row) {
+        updateRow(row, file, options);
+        if (additions) {
+          this.listEl.insertBefore(additions, cursor);
+          additions = null;
+        }
+        if (row.el === cursor) cursor = cursor.nextElementSibling;
+        else this.listEl.insertBefore(row.el, cursor);
+      } else {
+        row = createRow(file, options);
+        if (file.path === this.selectedPath) row.el.addClass("is-selected");
+        additions ??= this.contentEl.ownerDocument.createDocumentFragment();
+        additions.appendChild(row.el);
+      }
+      // Only changed positions touch the live DOM. Unchanged rows retain focus,
+      // scroll position, and their SVG elements.
+      nextRows.set(file.path, row);
+      this.rowIndexes.set(file.path, this.orderedPaths.length);
+      this.orderedPaths.push(file.path);
+    }
+    if (additions) this.listEl.insertBefore(additions, cursor);
+    this.rows = nextRows;
 
     if (children.length === 0) {
       this.emptyEl.show();
@@ -247,22 +322,6 @@ export class FolderNavView extends ItemView {
       return;
     }
     this.emptyEl.hide();
-
-    const fragment = createFragment();
-    for (const child of children) {
-      const row = createRow(child, {
-        showExtensions: settings.showExtensions,
-        tintFor: (file) => this.tintFor(file),
-        onOpen: (file) => this.openEntry(file),
-        onContextMenu: (event, file) => this.showMenu(event, file),
-      });
-      if (child.path === this.selectedPath) row.addClass("is-selected");
-      this.rowEls.set(child.path, row);
-      fragment.appendChild(row);
-    }
-    this.listEl.appendChild(fragment);
-
-    if (hadFocus) this.listEl.focus();
   }
 
   // --------------------------------------------------------------- interaction
@@ -284,19 +343,20 @@ export class FolderNavView extends ItemView {
     }
   }
 
-  private select(path: string): void {
-    this.selectedPath = path;
-    for (const [rowPath, el] of this.rowEls) {
-      el.toggleClass("is-selected", rowPath === path);
+  private select(path: string | null, scroll = true): void {
+    if (this.selectedPath !== path) {
+      if (this.selectedPath) this.rows.get(this.selectedPath)?.el.removeClass("is-selected");
+      if (path) this.rows.get(path)?.el.addClass("is-selected");
     }
-    this.rowEls.get(path)?.scrollIntoView({ block: "nearest" });
+    this.selectedPath = path;
+    if (scroll && path) this.rows.get(path)?.el.scrollIntoView({ block: "nearest" });
   }
 
   private onKeyDown(evt: KeyboardEvent): void {
-    const ordered = Array.from(this.rowEls.keys());
+    const ordered = this.orderedPaths;
     if (ordered.length === 0) return;
 
-    const current = this.selectedPath ? ordered.indexOf(this.selectedPath) : -1;
+    const current = this.selectedPath ? this.rowIndexes.get(this.selectedPath) ?? -1 : -1;
 
     switch (evt.key) {
       case "ArrowDown": {
@@ -327,7 +387,7 @@ export class FolderNavView extends ItemView {
         return;
       }
       case "Escape": {
-        this.select("");
+        this.select(null);
         return;
       }
     }
@@ -350,55 +410,44 @@ export class FolderNavView extends ItemView {
   }
 
   private onContextMenu(event: MouseEvent): void {
-    if ((event.target as HTMLElement).closest(".folder-nav-row")) return;
     event.preventDefault();
     // Right-clicking empty space targets the folder you are standing in.
-    this.showMenu(event, this.currentFolder());
+    this.showMenu(event, this.fileAtEvent(event) ?? this.currentFolder());
+  }
+
+  private fileAtEvent(event: MouseEvent): TAbstractFile | null {
+    const row = (event.target as HTMLElement).closest<HTMLElement>(".folder-nav-row");
+    if (!row || !this.listEl.contains(row) || !row.dataset.path) return null;
+    return this.plugin.app.vault.getAbstractFileByPath(row.dataset.path);
   }
 
   // -------------------------------------------------------------- live updates
 
-  private static parentOf(path: string): string {
-    const slash = path.lastIndexOf("/");
-    return slash === -1 ? ROOT : path.slice(0, slash);
-  }
-
   private parentPathOf(file: TAbstractFile): string {
-    return FolderNavView.parentOf(file.path);
-  }
-
-  /** True when `path` is the current folder or lives inside it. */
-  private withinCurrent(path: string): boolean {
-    return path === this.currentPath || path.startsWith(`${this.currentPath}/`);
+    return parentPath(file.path);
   }
 
   private onVaultChanged(file: TAbstractFile): void {
     // Standing in a folder that just got deleted — retreat to the nearest
     // ancestor that still exists.
-    if (file.path === this.currentPath || this.currentPath.startsWith(`${file.path}/`)) {
-      this.navigateTo(FolderNavView.parentOf(file.path));
+    if (isWithin(this.currentPath, file.path)) {
+      this.navigateTo(parentPath(file.path));
       return;
     }
-    if (this.parentPathOf(file) === this.currentPath) this.render();
+    if (this.selectedPath && isWithin(this.selectedPath, file.path)) this.select(null, false);
+    if (this.parentPathOf(file) === this.currentPath) this.refresh();
   }
 
   private onRenamed(file: TAbstractFile, oldPath: string): void {
-    // The folder we are standing in (or below) was renamed — follow it.
-    if (this.withinCurrent(oldPath)) {
-      this.history = this.history.map((p) =>
-        p === oldPath || p.startsWith(`${oldPath}/`) ? file.path + p.slice(oldPath.length) : p
-      );
-      this.currentPath = this.history[this.historyIndex];
-      if (this.selectedPath && this.withinCurrent(this.selectedPath)) {
-        this.selectedPath = file.path + this.selectedPath.slice(oldPath.length);
-      }
-      this.render();
-      return;
+    const oldCurrent = this.currentPath;
+    // Rebase all history, even when the renamed folder is not currently open.
+    this.history = this.history.map((path) => rebasePath(path, oldPath, file.path));
+    this.currentPath = rebasePath(this.currentPath, oldPath, file.path);
+    if (this.selectedPath) {
+      this.select(rebasePath(this.selectedPath, oldPath, file.path), false);
     }
-    // A direct child moved in or out of view.
-    if (this.parentPathOf(file) === this.currentPath || FolderNavView.parentOf(oldPath) === this.currentPath) {
-      this.render();
-    }
+    if (oldCurrent !== this.currentPath || this.parentPathOf(file) === this.currentPath ||
+        parentPath(oldPath) === this.currentPath) this.refresh();
   }
 
   private onFileOpen(file: TFile | null): void {

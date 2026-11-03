@@ -20,7 +20,7 @@ const PLUGIN_DIR = process.env.OBSIDIAN_PLUGIN_DIR
 const ASSETS = ["manifest.json", "styles.css"];
 
 const banner = `/*
-Folder Nav — bundled by esbuild on ${new Date().toISOString()}
+Folder Nav — bundled by esbuild
 Source: https://github.com/mianfuqu/obsidian-folder-nav
 */`;
 
@@ -50,15 +50,21 @@ const context = await esbuild.context({
   treeShaking: true,
   outfile: "main.js",
   minify: prod,
+  plugins: [{
+    name: "deploy-on-rebuild",
+    setup(build) {
+      build.onEnd((result) => {
+        if (result.errors.length === 0) deploy();
+      });
+    },
+  }],
 });
 
 if (prod) {
   await context.rebuild();
   await context.dispose();
-  deploy();
 } else {
   await context.watch();
-  deploy();
   // styles.css and manifest.json are plain copies, so esbuild won't rebuild on
   // their change — watch them by hand.
   for (const asset of ASSETS) {

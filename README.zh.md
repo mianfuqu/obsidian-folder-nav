@@ -96,16 +96,30 @@ Folder Nav 替换的是文件列表 **leaf 里的那个视图**,而不是禁用 
 ## 开发
 
 ```bash
-npm install
+npm ci
+npm run check     # TypeScript 类型检查
+npm test          # Node 内置测试运行器执行回归测试
 npm run build     # 类型检查 + 打包
 npm run dev       # 监听模式
 ```
+
+开发需要 Node.js 18 或更高版本。工具链只保留 TypeScript、esbuild 和官方
+Obsidian API 类型包三个直接依赖。默认不再安装 ESLint 及其 Obsidian 规则，
+类型检查与行为测试分别执行。插件运行时只导入 Obsidian。
+
+列表会复用已有行节点和 SVG 图标，统一处理行事件，并将同一帧内的文件事件合并刷新。
+键盘选择只更新前后两行；根目录文件先过滤再排序，扩展名规则解析后复用。
+测试使用 DOM 替身检查节点分配和事件批量刷新，并实际验证生产构建和监听构建；
+这些检查不包含浏览器布局耗时，仍需在 Obsidian 内验证实际交互。
 
 `main.js` 输出在项目根目录。开发时想顺便复制进某个库:
 
 ```bash
 OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
 ```
+
+监听模式也会在每次成功重新构建后复制到该目录。生产构建不再写入时间戳，
+相同源码会生成相同的打包文件。
 
 如果你装了 Obsidian CLI,调试闭环是这样:
 
@@ -115,6 +129,24 @@ obsidian vault=MyVault dev:errors
 obsidian vault=MyVault dev:screenshot path=/tmp/shot.png
 ```
 
+### GitHub 自动发布
+
+将 `.github/` 目录及本次修改提交到仓库。更新 `manifest.json` 的 `version`
+并推送到 GitHub 默认分支后，`Release Obsidian plugin` 工作流会自动执行
+`npm ci`、回归测试和构建，再创建与插件版本完全相同的标签和 Release
+(例如 `0.2.4`，不加 `v`)。只修改描述等字段不会发布，版本回退会报错。
+插件版本以 `manifest.json` 为准，不取 `package.json` 的版本。
+
+Release 包含 `main.js`、`manifest.json`、`styles.css`、可直接解压安装的
+`folder-nav-版本号.zip` 和 `SHA256SUMS.txt`。文件先上传到草稿，成功后才公开；
+重跑不会覆盖已经发布的 Release。也可以在 Actions 中手动运行此工作流，
+补发默认分支的当前版本。
+
+使用 GitHub 自带的 `GITHUB_TOKEN`，无需配置个人令牌。仓库须启用 Actions，
+且仓库或组织策略允许工作流使用 `contents: write` 创建 Release。
+每次更新插件版本时，也请同步维护根目录 `versions.json` 中的版本与最低
+Obsidian 版本映射，供旧版 Obsidian 查找兼容的历史版本。
+
 ### 源码结构
 
 ```
@@ -123,6 +155,8 @@ src/
 ├── view.ts       FolderNavView —— 导航状态、历史栈、列表渲染
 ├── takeover.ts   把内置文件列表的视图换成我们的,以及换回去
 ├── breadcrumb.ts 面包屑路径构建
+├── config.ts     默认设置与输入校验
+├── paths.ts      路径边界判断与重命名迁移
 ├── render.ts     单个列表行
 ├── palette.ts    文件夹调色板与就近继承查找
 ├── colorPicker.ts 取色弹窗

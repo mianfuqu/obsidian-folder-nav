@@ -39,15 +39,22 @@ function displayName(file: TAbstractFile, showExtensions: boolean): string {
   return extension ? file.name.slice(0, -(extension.length + 1)) : file.name;
 }
 
-export interface RowHandlers {
+export interface RowOptions {
   showExtensions: boolean;
-  /** A translucent background colour for this row, or null for none. */
-  tintFor: (file: TAbstractFile) => string | null;
-  onOpen: (file: TAbstractFile) => void;
-  onContextMenu: (event: MouseEvent, file: TAbstractFile) => void;
+  tint: string | null;
 }
 
-export function createRow(file: TAbstractFile, handlers: RowHandlers): HTMLElement {
+export interface RenderedRow {
+  el: HTMLElement;
+  isFolder: boolean;
+  nameEl: HTMLElement;
+  iconEl: HTMLElement;
+  name: string;
+  icon: string;
+  tint: string | null;
+}
+
+export function createRow(file: TAbstractFile, options: RowOptions): RenderedRow {
   const isFolder = file instanceof TFolder;
 
   const row = createDiv({ cls: "folder-nav-row" });
@@ -55,30 +62,35 @@ export function createRow(file: TAbstractFile, handlers: RowHandlers): HTMLEleme
   row.dataset.path = file.path;
   row.tabIndex = -1;
 
-  const tint = handlers.tintFor(file);
-  if (tint) {
-    row.addClass("has-tint");
-    row.style.setProperty("--fn-tint", tint);
-  }
-
-  const icon = row.createSpan({ cls: "folder-nav-row-icon" });
-  setIcon(icon, iconFor(file));
-
-  row.createSpan({
-    cls: "folder-nav-row-name",
-    text: displayName(file, handlers.showExtensions),
-  });
+  const iconEl = row.createSpan({ cls: "folder-nav-row-icon" });
+  const nameEl = row.createSpan({ cls: "folder-nav-row-name" });
 
   if (isFolder) {
     const chevron = row.createSpan({ cls: "folder-nav-row-chevron" });
     setIcon(chevron, "chevron-right");
   }
 
-  row.addEventListener("click", () => handlers.onOpen(file));
-  row.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    handlers.onContextMenu(event, file);
-  });
+  const result: RenderedRow = { el: row, isFolder, nameEl, iconEl, name: "", icon: "", tint: null };
+  updateRow(result, file, options);
+  return result;
+}
 
-  return row;
+/** Retain DOM nodes and SVGs when a vault event leaves their content unchanged. */
+export function updateRow(row: RenderedRow, file: TAbstractFile, options: RowOptions): void {
+  const name = displayName(file, options.showExtensions);
+  if (row.name !== name) {
+    row.name = name;
+    row.nameEl.setText(name);
+  }
+  const icon = iconFor(file);
+  if (row.icon !== icon) {
+    row.icon = icon;
+    setIcon(row.iconEl, icon);
+  }
+  if (row.tint !== options.tint) {
+    row.tint = options.tint;
+    row.el.toggleClass("has-tint", options.tint !== null);
+    if (options.tint) row.el.style.setProperty("--fn-tint", options.tint);
+    else row.el.style.removeProperty("--fn-tint");
+  }
 }

@@ -9,6 +9,7 @@ import {
   TFolder,
   normalizePath,
 } from "obsidian";
+import { isWithin } from "./paths";
 
 /*
  * The context menu we show is built by hand.
@@ -93,6 +94,10 @@ class RenameModal extends Modal {
         this.close();
         return;
       }
+      if (next === "." || next === ".." || /[/\\]/.test(next)) {
+        new Notice("文件名不能包含路径分隔符或使用 . / ..");
+        return;
+      }
       const target = childPath(parentOf(this.file, this.app), next);
       if (this.app.vault.getAbstractFileByPath(target)) {
         new Notice(`已存在:${next}`);
@@ -142,16 +147,17 @@ class MoveModal extends FuzzySuggestModal<TFolder> {
 
   getItems(): TFolder[] {
     const folders: TFolder[] = [this.app.vault.getRoot()];
-    const walk = (folder: TFolder) => {
+    const pending = [this.app.vault.getRoot()];
+    while (pending.length > 0) {
+      const folder = pending.pop()!;
       for (const child of folder.children) {
         if (!(child instanceof TFolder)) continue;
         // Moving a folder into itself or its own subtree would be a loop.
-        if (this.file instanceof TFolder && child.path.startsWith(this.file.path)) continue;
+        if (this.file instanceof TFolder && isWithin(child.path, this.file.path)) continue;
         folders.push(child);
-        walk(child);
+        pending.push(child);
       }
-    };
-    walk(this.app.vault.getRoot());
+    }
     return folders;
   }
 
@@ -211,6 +217,10 @@ export function addCoreFileMenuItems(app: App, menu: Menu, file: TAbstractFile):
         .onClick(() => void app.workspace.getLeaf("split", "vertical").openFile(file))
     );
   }
+
+  // The vault root may receive the blank-space menu, but cannot be moved,
+  // renamed, copied into itself, or deleted by this plugin.
+  if (file instanceof TFolder && file.isRoot()) return;
 
   menu.addItem((item) =>
     item

@@ -1,7 +1,9 @@
 import { TAbstractFile, TFile, TFolder } from "obsidian";
-import type { FolderNavSettings } from "./settings";
+import type { FolderNavSettings } from "./config";
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+let cachedExtensions = "";
+let hiddenExtensions = new Set<string>();
 
 function byName(a: TAbstractFile, b: TAbstractFile): number {
   return collator.compare(a.name, b.name);
@@ -66,16 +68,17 @@ export function applyRootFilter(
 ): TAbstractFile[] {
   if (!isRoot || !settings.hideRootFiles) return children;
 
-  const hidden = new Set(
-    settings.hiddenExtensions
+  if (cachedExtensions !== settings.hiddenExtensions) {
+    cachedExtensions = settings.hiddenExtensions;
+    hiddenExtensions = new Set(cachedExtensions
       .split(",")
       .map((ext) => ext.trim().toLowerCase().replace(/^\./, ""))
-      .filter(Boolean)
-  );
-  if (hidden.size === 0) return children;
+      .filter(Boolean));
+  }
+  if (hiddenExtensions.size === 0) return children;
 
   return children.filter((file) => {
     if (!(file instanceof TFile)) return true;
-    return !hidden.has(file.extension.toLowerCase());
+    return !hiddenExtensions.has(file.extension.toLowerCase());
   });
 }
