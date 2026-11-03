@@ -32,6 +32,13 @@ Get future updates from [this repository's Releases](https://github.com/ooeooo/o
 Keep only one of these plugins enabled, as both replace the native file explorer.
 `versions.json` lists only releases using the new ID; older releases remain in history.
 
+For updates within this fork, quit Obsidian completely, replace **all three** files
+(`main.js`, `manifest.json`, `styles.css`) in `.obsidian/plugins/folder-nav-ooeooo/`,
+and reopen Obsidian. Keep `data.json` to retain your settings. If the settings
+sidebar still says `Folder Nav (ooeooo)`, check that this directory's
+`manifest.json` has `"name": "Folder Nav"` and restart the app; replacing only
+`main.js` or toggling the plugin can leave the old name in memory.
+
 ## Why
 
 Obsidian's file explorer indents every level. By the third or fourth level — `Notes › Course › Week 3 › Handout.pdf` — the names are squeezed into a sliver, and the whole tree is always on screen competing for attention.
@@ -44,8 +51,9 @@ Enabled by default: it takes over the built-in **Files** view. The sidebar tab i
 
 The header has two rows: a responsive path above **Back / Forward / Parent / Vault root**.
 The vault root is a home icon; its full name remains in the tooltip and path menu.
-Both rows fill the available sidebar width, with four equal-width toolbar buttons
-and path segments that share the remaining space.
+Both rows fill the available sidebar width. The path is left-aligned: each segment
+uses its text width, stays next to its neighbours, and shrinks only when necessary.
+The four toolbar buttons share the second row equally.
 Nearby levels stay visible while distant ancestors collapse into `…`. Open it for a
 full-path menu that can extend beyond the sidebar, wrap long names, and jump to any
 ancestor. The path refits when the sidebar width, font size, or theme font changes.

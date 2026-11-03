@@ -402,7 +402,6 @@ export class FolderNavView extends ItemView {
     const widths = this.crumbParts.map((part) => part.measure.getBoundingClientRect().width);
     const separator = this.separatorMeasureEl.getBoundingClientRect().width;
     const start = firstVisibleCrumb(widths, this.crumbEl.clientWidth, 28, separator);
-    this.crumbEl.toggleClass("is-compact", start > 0 && this.crumbParts.length - start === 2);
     this.overflowEl.hidden = start === 0;
     this.crumbParts.forEach((part, index) => { part.el.hidden = index < start; });
     if (start === 0) this.pathMenu?.close();

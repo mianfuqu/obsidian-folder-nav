@@ -72,7 +72,8 @@
 .folder-nav-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 1px;
+  justify-content: flex-start;
+  gap: 0;
   width: 100%;
   flex: 0 0 auto;
   min-width: 0;
@@ -94,7 +95,6 @@
 }
 
 .folder-nav-crumb-part.is-current {
-  flex: 1 1 auto;
   max-width: 100%;
 }
 
@@ -102,19 +102,11 @@
   flex: 0 0 auto;
 }
 
-.folder-nav-breadcrumb.is-compact .folder-nav-crumb-part:not(.is-current) {
-  flex: 1 1 0;
-}
-
-.folder-nav-breadcrumb.is-compact .folder-nav-crumb-part.is-current {
-  flex: 1.5 1 0;
-}
-
 .folder-nav .folder-nav-crumb {
   display: block;
   min-width: 0;
   max-width: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   height: auto;
   min-height: 28px;
   padding: 3px 4px;
@@ -126,6 +118,7 @@
   font-size: inherit;
   font-weight: var(--nav-item-weight, 400);
   line-height: 1.45;
+  text-align: left;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
