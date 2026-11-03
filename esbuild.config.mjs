@@ -20,7 +20,7 @@ const PLUGIN_DIR = process.env.OBSIDIAN_PLUGIN_DIR
 const ASSETS = ["manifest.json", "styles.css"];
 
 const banner = `/*
-Folder Nav (ooeooo) — bundled by esbuild
+Folder Nav — bundled by esbuild
 Source: https://github.com/ooeooo/obsidian-folder-nav
 Upstream: https://github.com/mianfuqu/obsidian-folder-nav
 */`;

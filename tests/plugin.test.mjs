@@ -12,6 +12,7 @@ test("fork identity is independent of the upstream plugin and its view namespace
   const versions = JSON.parse(await readFile(new URL("../versions.json", import.meta.url), "utf8"));
   assert.notEqual(manifest.id, "folder-nav");
   assert.equal(manifest.id, "folder-nav-ooeooo");
+  assert.equal(manifest.name, "Folder Nav");
   assert.equal(api.VIEW_TYPE, `${manifest.id}-view`);
   assert.equal(pkg.name, manifest.id);
   assert.equal(pkg.version, manifest.version);

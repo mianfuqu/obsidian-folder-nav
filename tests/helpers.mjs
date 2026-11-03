@@ -88,7 +88,8 @@ export class Element {
   get clientWidth() { return this._clientWidth ?? 240; }
   set clientWidth(value) { this._clientWidth = value; }
   getBoundingClientRect() {
-    const width = this.classes.has("folder-nav-crumb-sep") ? 16
+    const width = this.classes.has("folder-nav-crumb-home") ? 28
+      : this.classes.has("folder-nav-crumb-sep") ? 16
       : this.classes.has("folder-nav-path-menu") ? 360
       : this.textContent.length * 8 + 8;
     return {x: 0, y: 0, left: 0, top: 0, width, height: this.children.length * 20 + 32,
@@ -182,7 +183,7 @@ const obsidian = {
   ItemView, TAbstractFile, TFolder, TFile, Menu, Modal, FuzzySuggestModal: Modal,
   Plugin: Component, PluginSettingTab: Component, Notice: class {},
   normalizePath: path => path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, ""),
-  setIcon() { metrics.icons++; },
+  setIcon(el, name) { metrics.icons++; el.icon = name; },
 };
 
 export async function loadPlugin() {

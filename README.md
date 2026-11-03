@@ -1,4 +1,4 @@
-# Folder Nav (ooeooo)
+# Folder Nav
 
 **English** · [简体中文](README.zh.md)
 
@@ -14,9 +14,10 @@ No more ever-deepening indentation eating the width of a narrow sidebar.
 ## Fork identity and migration
 
 This is an independent fork of [Folder Nav](https://github.com/mianfuqu/obsidian-folder-nav).
-Starting with `0.2.5`, its plugin ID is **`folder-nav-ooeooo`** and its display
-name is **Folder Nav (ooeooo)**. Obsidian identifies it separately from the
-community-listed `folder-nav`, so upstream updates will not replace this fork.
+Starting with `0.2.5`, its plugin ID is **`folder-nav-ooeooo`**. From `0.2.7`, its display
+name is **Folder Nav**. Obsidian uses the independent plugin ID to identify it
+separately from the community-listed `folder-nav`, even though their display
+names match, so upstream updates will not replace this fork.
 Get future updates from [this repository's Releases](https://github.com/ooeooo/obsidian-folder-nav/releases).
 
 1. Disable the old Folder Nav. To retain settings, first back up
@@ -25,7 +26,7 @@ Get future updates from [this repository's Releases](https://github.com/ooeooo/o
    `.obsidian/plugins/`. Disabling it alone may still leave upstream update notices.
 3. Extract the new ZIP into `.obsidian/plugins/folder-nav-ooeooo/`.
    Copy the backed-up `data.json` into this new directory if needed.
-4. Restart Obsidian and enable **Folder Nav (ooeooo)**. Rebind any old plugin
+4. Restart Obsidian and enable **Folder Nav**. Rebind any old plugin
    hotkeys, since the command IDs now use the fork's plugin ID.
 
 Keep only one of these plugins enabled, as both replace the native file explorer.
@@ -42,6 +43,9 @@ Folder Nav keeps the sidebar at a constant depth. You see the folder you're stan
 Enabled by default: it takes over the built-in **Files** view. The sidebar tab is unchanged, and so is the ribbon icon.
 
 The header has two rows: a responsive path above **Back / Forward / Parent / Vault root**.
+The vault root is a home icon; its full name remains in the tooltip and path menu.
+Both rows fill the available sidebar width, with four equal-width toolbar buttons
+and path segments that share the remaining space.
 Nearby levels stay visible while distant ancestors collapse into `…`. Open it for a
 full-path menu that can extend beyond the sidebar, wrap long names, and jump to any
 ancestor. The path refits when the sidebar width, font size, or theme font changes.
@@ -76,12 +80,12 @@ Home/End, Enter, and Escape with focus restoration.
 
 **Commands** (also bindable in Settings → Hotkeys)
 
-- `Folder Nav (ooeooo): Toggle drill-down / native file list`
-- `Folder Nav (ooeooo): Go to vault root`
-- `Folder Nav (ooeooo): Go up one level`
-- `Folder Nav (ooeooo): Back to previous directory`
-- `Folder Nav (ooeooo): Forward in directory history`
-- `Folder Nav (ooeooo): Reveal current file in list`
+- `Folder Nav: Toggle drill-down / native file list`
+- `Folder Nav: Go to vault root`
+- `Folder Nav: Go up one level`
+- `Folder Nav: Back to previous directory`
+- `Folder Nav: Forward in directory history`
+- `Folder Nav: Reveal current file in list`
 
 ## Folder colours
 
@@ -94,7 +98,7 @@ Give a folder a colour and it carries into everything below it: the row is tinte
 
 **Set one** — right-click a folder → **Folder colour**, then pick a swatch. A folder with no colour of its own inherits the nearest coloured ancestor, so drilling deeper keeps the cue.
 
-**Manage them** — Settings → Folder Nav (ooeooo) → Folder colours lists every coloured folder, with a **Background intensity** slider. At `0` only the folder row is tinted and the list background is left alone.
+**Manage them** — Settings → Folder Nav → Folder colours lists every coloured folder, with a **Background intensity** slider. At `0` only the folder row is tinted and the list background is left alone.
 
 Manual colors apply to folder icons and translucent backgrounds; text follows the
 theme. Theme hover and selection backgrounds take precedence over manual row tinting.
@@ -143,7 +147,7 @@ Nothing in your vault configuration is rewritten. `workspace.json` and `core-plu
 - **No drag-and-drop to move files.** Obsidian's native drag handling is bound to its own explorer internals; reusing it means depending on undocumented APIs. Use the context menu's **Move to…** instead, which opens a folder picker.
 - **No inline rename (F2) and no multi-select.** **Rename** lives in the context menu and opens a small dialog. Select one file at a time.
 - **Custom folder order isn't reproduced.** Sorting is computed from your chosen order rather than borrowed from the built-in explorer, which is destroyed on takeover. Folders you manually reordered with another plugin will sort by name or date instead.
-- **Obsidian's own "Reveal file in navigation" does nothing while the takeover is on.** It targets the built-in explorer's view, which is no longer loaded, so it quietly no-ops — it won't open a second file list or throw. Use **Folder Nav (ooeooo): Reveal current file in list** instead, and rebind your hotkey to it if you had one on the built-in command.
+- **Obsidian's own "Reveal file in navigation" does nothing while the takeover is on.** It targets the built-in explorer's view, which is no longer loaded, so it quietly no-ops — it won't open a second file list or throw. Use **Folder Nav: Reveal current file in list** instead, and rebind your hotkey to it if you had one on the built-in command.
 - **A major Obsidian update may still require fixes.** The takeover is built on the public workspace API, but it does replace a core view, which no API promises to keep working. The failure mode is safe by design: if the takeover can't run, you get the native file list back.
 - **Desktop and mobile.** `isDesktopOnly` is off, but the drill-down layout has mainly been exercised on desktop.
 

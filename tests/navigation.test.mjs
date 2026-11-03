@@ -4,6 +4,22 @@ import { loadPlugin, makeView, TFolder, flushFrames, pendingFrames, resizeObserv
 
 const api = await loadPlugin();
 
+test("root breadcrumb uses an accessible home icon while the full-path menu retains the vault name", async () => {
+  const {view, add} = await makeView(api, 0);
+  const root = view.crumbParts[0].el.children[0];
+  assert.equal(root.icon, "house");
+  assert.equal(root.textContent, "");
+  assert.equal(root.dataset.path, "");
+  assert.equal(root.getAttribute("aria-label"), "库根目录：Test vault");
+  add(new TFolder("A")); view.navigateTo("A");
+  const home = view.crumbParts[0].el.children[0];
+  assert.equal(home.icon, "house");
+  assert.equal(home.textContent, "");
+  assert.equal(view.crumbs[0].label, "Test vault");
+  home.dispatch("click"); assert.equal(view.currentPath, "");
+  await view.onClose();
+});
+
 test("toolbar separates browser history from parent/root navigation", async () => {
   const {view, add} = await makeView(api, 0);
   const a = add(new TFolder("A"));

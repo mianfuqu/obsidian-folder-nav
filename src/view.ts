@@ -92,7 +92,6 @@ export class FolderNavView extends ItemView {
     toolbar.setAttribute("aria-label", "目录导航");
     this.backEl = this.navigationButton(toolbar, "arrow-left", "后退", () => this.goBack());
     this.forwardEl = this.navigationButton(toolbar, "arrow-right", "前进", () => this.goForward());
-    toolbar.createSpan({ cls: "folder-nav-toolbar-divider" }).setAttribute("aria-hidden", "true");
     this.upEl = this.navigationButton(toolbar, "arrow-up", "上一级", () => this.goUp());
     this.homeEl = this.navigationButton(toolbar, "house", "库根目录", () => this.navigateTo(ROOT));
     this.crumbMeasureEl = header.createDiv({ cls: "folder-nav-breadcrumb-measure" });
@@ -363,14 +362,23 @@ export class FolderNavView extends ItemView {
     this.separatorMeasureEl = this.crumbMeasureEl.createSpan({ cls: "folder-nav-crumb-sep", text: "›" });
     this.crumbParts = this.crumbs.map((crumb, index) => {
       const isLast = index === this.crumbs.length - 1;
+      const isRoot = index === 0;
       const part = this.crumbEl.createSpan({ cls: "folder-nav-crumb-part" });
       if (isLast) part.addClass("is-current");
+      if (isRoot) part.addClass("is-root");
       if (index > 0) part.createSpan({ cls: "folder-nav-crumb-sep", text: "›" }).setAttribute("aria-hidden", "true");
-      const button = part.createEl("button", { cls: "folder-nav-crumb", text: crumb.label, type: "button" });
+      const button = part.createEl("button", { cls: "folder-nav-crumb", text: isRoot ? undefined : crumb.label, type: "button" });
       button.dataset.path = crumb.path;
       button.title = crumb.path || crumb.label;
-      const measure = this.crumbMeasureEl.createEl("button", { cls: "folder-nav-crumb", text: crumb.label, type: "button" });
+      const measure = this.crumbMeasureEl.createEl("button", { cls: "folder-nav-crumb", text: isRoot ? undefined : crumb.label, type: "button" });
       measure.tabIndex = -1;
+      if (isRoot) {
+        button.addClass("folder-nav-crumb-home");
+        measure.addClass("folder-nav-crumb-home");
+        button.setAttribute("aria-label", `库根目录：${crumb.label}`);
+        setIcon(button, "house");
+        setIcon(measure, "house");
+      }
       if (isLast) {
         button.addClass("is-current");
         measure.addClass("is-current");
@@ -393,7 +401,7 @@ export class FolderNavView extends ItemView {
     if (!this.crumbParts.length) return;
     const widths = this.crumbParts.map((part) => part.measure.getBoundingClientRect().width);
     const separator = this.separatorMeasureEl.getBoundingClientRect().width;
-    const start = firstVisibleCrumb(widths, this.crumbEl.clientWidth, 32, separator);
+    const start = firstVisibleCrumb(widths, this.crumbEl.clientWidth, 28, separator);
     this.crumbEl.toggleClass("is-compact", start > 0 && this.crumbParts.length - start === 2);
     this.overflowEl.hidden = start === 0;
     this.crumbParts.forEach((part, index) => { part.el.hidden = index < start; });
