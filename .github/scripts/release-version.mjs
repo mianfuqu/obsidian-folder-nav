@@ -16,6 +16,9 @@ export function releaseInfo(manifest, previous, eventName) {
   if (typeof manifest.id !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(manifest.id)) {
     throw new Error("manifest.id must contain lowercase letters, digits, and hyphens");
   }
+  if (typeof manifest.name !== "string" || !manifest.name.trim() || /[\r\n]/.test(manifest.name)) {
+    throw new Error("manifest.name must be a nonempty single-line string");
+  }
   let changed = true;
   if (eventName !== "workflow_dispatch" && previous) {
     const before = parseVersion(previous.version);
@@ -25,7 +28,7 @@ export function releaseInfo(manifest, previous, eventName) {
     }
     changed = index !== -1;
   }
-  return { changed, version: manifest.version, id: manifest.id };
+  return { changed, version: manifest.version, id: manifest.id, name: manifest.name };
 }
 
 function previousManifest(before, root) {
@@ -51,6 +54,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
   const info = detectRelease(process.cwd(), process.env.GITHUB_EVENT_NAME, event);
   appendFileSync(process.env.GITHUB_OUTPUT,
-    `changed=${info.changed}\nversion=${info.version}\nid=${info.id}\n`);
+    `changed=${info.changed}\nversion=${info.version}\nid=${info.id}\nname=${info.name}\n`);
   console.log(info.changed ? `Prepare plugin release ${info.version}` : "Plugin version unchanged; skipping release");
 }

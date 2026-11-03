@@ -9,7 +9,7 @@ const prod = process.argv[2] === "production";
  * Where the built plugin gets copied for testing. Point this at the plugin
  * folder inside the vault you develop against, e.g.
  *
- *   OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
+ *   OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav-ooeooo npm run build
  *
  * Leave it unset to just build main.js without deploying anywhere.
  */
@@ -20,8 +20,9 @@ const PLUGIN_DIR = process.env.OBSIDIAN_PLUGIN_DIR
 const ASSETS = ["manifest.json", "styles.css"];
 
 const banner = `/*
-Folder Nav — bundled by esbuild
-Source: https://github.com/mianfuqu/obsidian-folder-nav
+Folder Nav (ooeooo) — bundled by esbuild
+Source: https://github.com/ooeooo/obsidian-folder-nav
+Upstream: https://github.com/mianfuqu/obsidian-folder-nav
 */`;
 
 function deploy() {

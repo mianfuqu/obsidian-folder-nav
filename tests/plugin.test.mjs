@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { loadPlugin, makeView, TFile, TFolder, Menu, openedModals,
   metrics, resetMetrics, flushFrames, pendingFrames } from "./helpers.mjs";
 
 const api = await loadPlugin();
+
+test("fork identity is independent of the upstream plugin and its view namespace", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8"));
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const versions = JSON.parse(await readFile(new URL("../versions.json", import.meta.url), "utf8"));
+  assert.notEqual(manifest.id, "folder-nav");
+  assert.equal(manifest.id, "folder-nav-ooeooo");
+  assert.equal(api.VIEW_TYPE, `${manifest.id}-view`);
+  assert.equal(pkg.name, manifest.id);
+  assert.equal(pkg.version, manifest.version);
+  assert.equal(versions[manifest.version], manifest.minAppVersion);
+  const {view} = await makeView(api, 0);
+  assert.equal(view.getViewType(), "folder-nav-ooeooo-view");
+  await view.onClose();
+});
 
 test("malformed settings fall back to independent, validated defaults", () => {
   for (const input of [null, [], 42, {recentColors: 42, hiddenExtensions: null, enabled: "false"}]) {

@@ -1,4 +1,4 @@
-# Folder Nav
+# Folder Nav (ooeooo)
 
 [English](README.md) · **简体中文**
 
@@ -10,6 +10,26 @@
   <img src="assets/demo-root.png" width="300" alt="库根目录:文件夹带箭头,下面是文件">
   <img src="assets/demo-nested.png" width="300" alt="进入文件夹后:顶部显示面包屑路径">
 </p>
+
+## 分支身份与旧版本迁移
+
+这是 [Folder Nav](https://github.com/mianfuqu/obsidian-folder-nav) 的独立分支。
+从 `0.2.5` 起，插件 ID 为 **`folder-nav-ooeooo`**，显示名称为
+**Folder Nav (ooeooo)**，与官方插件库中的 `folder-nav` 分开识别。
+Obsidian 不会再用官方 `folder-nav` 的版本覆盖这个分支。
+后续请从[本仓库 Releases](https://github.com/ooeooo/obsidian-folder-nav/releases)更新。
+
+1. 在 Obsidian 中禁用旧的 Folder Nav；如需保留设置，先备份
+   `.obsidian/plugins/folder-nav/data.json`（如果存在）。
+2. 卸载旧插件，或将整个 `folder-nav` 目录移出 `.obsidian/plugins/`。
+   仅禁用旧插件仍可能看到它的官方更新提示。
+3. 解压新版 ZIP，将 `folder-nav-ooeooo` 文件夹放入 `.obsidian/plugins/`。
+   如有设置备份，将 `data.json` 复制到新文件夹中。
+4. 重启 Obsidian，在第三方插件列表启用 **Folder Nav (ooeooo)**。
+   插件 ID 已改变，原来绑定的快捷键需要重新绑定。
+
+请勿同时启用本分支与旧版 Folder Nav；两者都会接管原生文件列表。
+`versions.json` 只列出采用新 ID 的版本，旧版本保留在 Release 历史中。
 
 ## 为什么
 
@@ -44,10 +64,10 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 
 **命令**(也可以在 设置 → 快捷键 里自行绑定)
 
-- `Folder Nav: 切换逐层导航 / 原生文件列表`
-- `Folder Nav: 回到库根目录`
-- `Folder Nav: 返回上一级文件夹`
-- `Folder Nav: 定位到当前文件`
+- `Folder Nav (ooeooo): 切换逐层导航 / 原生文件列表`
+- `Folder Nav (ooeooo): 回到库根目录`
+- `Folder Nav (ooeooo): 返回上一级文件夹`
+- `Folder Nav (ooeooo): 定位到当前文件`
 
 ## 文件夹颜色
 
@@ -60,7 +80,7 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 
 **设置颜色** —— 右键任意文件夹 → **文件夹颜色**,点一个色块即可。自己没有颜色的文件夹会**继承最近的上级颜色**,所以往更深层走也不会丢掉提示。
 
-**管理颜色** —— 设置 → Folder Nav → 文件夹颜色 会列出所有已上色的文件夹,旁边有「背景染色强度」滑块。设为 `0` 时只染文件夹那一行,列表背景不动。
+**管理颜色** —— 设置 → Folder Nav (ooeooo) → 文件夹颜色 会列出所有已上色的文件夹,旁边有「背景染色强度」滑块。设为 `0` 时只染文件夹那一行,列表背景不动。
 
 颜色一律是**半透明叠在你主题自己的背景之上**,从不改动前景色 —— 所以文字清晰度完全由你的主题决定,不会因为染色而看不清。
 
@@ -89,7 +109,7 @@ Folder Nav 替换的是文件列表 **leaf 里的那个视图**,而不是禁用 
 - **不能拖拽移动文件。** Obsidian 原生的拖拽绑定在它自己的文件列表内部实现上,复用它就意味着依赖未公开接口。请用右键菜单的**「移动文件夹到…」**,它会打开一个文件夹选择器。
 - **没有 F2 原地重命名,也不支持多选。** **重命名**在右键菜单里,会弹一个小对话框。一次只能选一个文件。
 - **不还原自定义文件夹顺序。** 排序是算法算出来的,而不是向内置文件列表借的 —— 那个视图在接管时已经被销毁了。你用别的插件拖拽排过序的文件夹,这里会按名称或日期排。
-- **Obsidian 自带的「在文件列表中显示当前文件」在接管期间不起作用。** 它操作的是内置文件列表的视图,而那个视图已经不在加载状态,所以它会安静地什么都不做 —— 不会多开一个文件列表,也不会报错。请改用 **Folder Nav: 定位到当前文件**,如果你给原命令绑了快捷键,改绑到这个上。
+- **Obsidian 自带的「在文件列表中显示当前文件」在接管期间不起作用。** 它操作的是内置文件列表的视图,而那个视图已经不在加载状态,所以它会安静地什么都不做 —— 不会多开一个文件列表,也不会报错。请改用 **Folder Nav (ooeooo): 定位到当前文件**,如果你给原命令绑了快捷键,改绑到这个上。
 - **Obsidian 大版本更新后仍可能需要修。** 接管基于公开的工作区 API,但它毕竟替换了一个核心视图,而没有任何 API 承诺这件事永远有效。失效时的表现是安全的:接管跑不起来,你就拿回原生的文件列表。
 - **桌面和移动端。** `isDesktopOnly` 是关的,但逐层布局主要在桌面上验证过。
 
@@ -115,7 +135,7 @@ Obsidian API 类型包三个直接依赖。默认不再安装 ESLint 及其 Obsi
 `main.js` 输出在项目根目录。开发时想顺便复制进某个库:
 
 ```bash
-OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
+OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav-ooeooo npm run build
 ```
 
 监听模式也会在每次成功重新构建后复制到该目录。生产构建不再写入时间戳，
@@ -124,7 +144,7 @@ OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
 如果你装了 Obsidian CLI,调试闭环是这样:
 
 ```bash
-obsidian vault=MyVault plugin:reload id=folder-nav
+obsidian vault=MyVault plugin:reload id=folder-nav-ooeooo
 obsidian vault=MyVault dev:errors
 obsidian vault=MyVault dev:screenshot path=/tmp/shot.png
 ```
@@ -138,7 +158,7 @@ obsidian vault=MyVault dev:screenshot path=/tmp/shot.png
 插件版本以 `manifest.json` 为准，不取 `package.json` 的版本。
 
 Release 包含 `main.js`、`manifest.json`、`styles.css`、可直接解压安装的
-`folder-nav-版本号.zip` 和 `SHA256SUMS.txt`。文件先上传到草稿，成功后才公开；
+`folder-nav-ooeooo-版本号.zip` 和 `SHA256SUMS.txt`。文件先上传到草稿，成功后才公开；
 重跑不会覆盖已经发布的 Release。也可以在 Actions 中手动运行此工作流，
 补发默认分支的当前版本。
 
@@ -166,7 +186,8 @@ src/
 
 ## 贡献者
 
-- **mianfuqu** —— 作者与维护者
+- **mianfuqu** —— 原版作者
+- **ooeooo** —— 分支维护
 - **[DeepSeek](https://www.deepseek.com/)** —— 实现
 
 详见 [CONTRIBUTORS.md](CONTRIBUTORS.md)。

@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { detectRelease, releaseInfo } from "../.github/scripts/release-version.mjs";
 
-const manifest = { id: "folder-nav", version: "0.2.4", minAppVersion: "1.8.7" };
+const manifest = { id: "folder-nav-ooeooo", name: "Folder Nav (ooeooo)", version: "0.2.4", minAppVersion: "1.8.7" };
 
 test("release detection ignores description edits and detects numeric version increases", () => {
   assert.equal(releaseInfo(manifest, {...manifest, description: "previous"}, "push").changed, false);
@@ -25,6 +25,8 @@ test("invalid versions and unsafe asset names are rejected", () => {
   }
   assert.throws(() => releaseInfo({...manifest, id: "../bad"}, null, "push"), /manifest.id/);
   assert.throws(() => releaseInfo({...manifest, minAppVersion: "bad"}, null, "push"), /X.Y.Z/);
+  assert.throws(() => releaseInfo({...manifest, name: "title\nchanged=true"}, null, "push"), /single-line/);
+  assert.equal(releaseInfo(manifest, null, "push").name, "Folder Nav (ooeooo)");
 });
 
 test("push detection reads the event's previous commit, including multi-commit pushes", t => {

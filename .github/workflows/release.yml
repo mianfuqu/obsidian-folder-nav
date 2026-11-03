@@ -19,6 +19,7 @@ jobs:
       changed: ${{ steps.version.outputs.changed }}
       version: ${{ steps.version.outputs.version }}
       id: ${{ steps.version.outputs.id }}
+      name: ${{ steps.version.outputs.name }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -41,6 +42,7 @@ jobs:
     env:
       PLUGIN_ID: ${{ needs.version.outputs.id }}
       PLUGIN_VERSION: ${{ needs.version.outputs.version }}
+      PLUGIN_NAME: ${{ needs.version.outputs.name }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -116,7 +118,7 @@ jobs:
             gh release upload "$PLUGIN_VERSION" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$PLUGIN_VERSION" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --title "Folder Nav $PLUGIN_VERSION" --generate-notes --draft
+              --target "$GITHUB_SHA" --title "$PLUGIN_NAME $PLUGIN_VERSION" --generate-notes --draft
           fi
           release_id=$(gh release view "$PLUGIN_VERSION" --repo "$GITHUB_REPOSITORY" \
               --json databaseId --jq '.databaseId')

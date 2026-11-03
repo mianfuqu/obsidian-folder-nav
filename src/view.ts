@@ -15,7 +15,7 @@ import { createRow, RenderedRow, updateRow } from "./render";
 import { applyRootFilter, sortChildren } from "./sort";
 import { isWithin, parentPath, rebasePath } from "./paths";
 
-export const VIEW_TYPE = "folder-nav-view";
+export const VIEW_TYPE = "folder-nav-ooeooo-view";
 
 /** Vault root is represented by the empty string, matching Obsidian's own convention. */
 const ROOT = "";
