@@ -41,6 +41,11 @@ Folder Nav keeps the sidebar at a constant depth. You see the folder you're stan
 
 Enabled by default: it takes over the built-in **Files** view. The sidebar tab is unchanged, and so is the ribbon icon.
 
+The header has two rows: a responsive path above **Back / Forward / Parent / Vault root**.
+Nearby levels stay visible while distant ancestors collapse into `…`. Open it for a
+full-path menu that can extend beyond the sidebar, wrap long names, and jump to any
+ancestor. The path refits when the sidebar width, font size, or theme font changes.
+
 **Mouse**
 
 | Action | Result |
@@ -48,7 +53,8 @@ Enabled by default: it takes over the built-in **Files** view. The sidebar tab i
 | Click a folder | Go into it |
 | Click a file | Open it in the main editor area (never in the sidebar) |
 | Click a breadcrumb segment | Jump back to that level |
-| Click `←` | Go up one level |
+| Click `←` / `→` | Go back / forward in visit history |
+| Click `↑` / the home button | Go to the parent / vault root |
 | Right-click a file or folder | **New note** / **New folder**, **Rename**, **Move to…**, **Make a copy**, **Delete** — plus other plugins' menu items |
 
 > Obsidian adds its core context-menu items inside the file explorer's own code, *before* it fires the `file-menu` event — so a plugin listening to that event only ever sees third-party contributions. Since Folder Nav replaces that view, it rebuilds the core items itself on public API. **Delete** in particular hands off to Obsidian's own `promptForDeletion`, so your "confirm before deleting" setting is respected.
@@ -59,14 +65,22 @@ Enabled by default: it takes over the built-in **Files** view. The sidebar tab i
 | --- | --- |
 | `↑` / `↓` | Move the selection |
 | `Enter` | Open the selection |
-| `Backspace` / `Alt+←` / `Cmd/Ctrl+[` | Go up one level |
+| `Backspace` / `Alt+←` / `Cmd/Ctrl+[` | History back |
+| `Shift+Backspace` / `Alt+→` / `Cmd/Ctrl+]` | History forward |
+| `Alt+↑` | Parent folder |
 | `Esc` | Clear the selection |
+
+Navigating somewhere new after going back discards the old forward branch; repeated
+visits to the current location do not add history. The path menu supports arrows,
+Home/End, Enter, and Escape with focus restoration.
 
 **Commands** (also bindable in Settings → Hotkeys)
 
 - `Folder Nav (ooeooo): Toggle drill-down / native file list`
 - `Folder Nav (ooeooo): Go to vault root`
 - `Folder Nav (ooeooo): Go up one level`
+- `Folder Nav (ooeooo): Back to previous directory`
+- `Folder Nav (ooeooo): Forward in directory history`
 - `Folder Nav (ooeooo): Reveal current file in list`
 
 ## Folder colours
@@ -82,12 +96,16 @@ Give a folder a colour and it carries into everything below it: the row is tinte
 
 **Manage them** — Settings → Folder Nav (ooeooo) → Folder colours lists every coloured folder, with a **Background intensity** slider. At `0` only the folder row is tinted and the list background is left alone.
 
-Colours are always layered translucently over your theme's own background; foreground colours are never touched, so text stays exactly as legible as your theme makes it.
+Manual colors apply to folder icons and translucent backgrounds; text follows the
+theme. Theme hover and selection backgrounds take precedence over manual row tinting.
+Clear a manual color to resume the theme's automatic colors.
 
 ## Settings
 
 | Setting | Description |
 | --- | --- |
+| **Path font size** | Follow the theme by default, or choose 12–22px with live preview. Reset restores theme inheritance. |
+| **File-list font size** | Independent of the path, with the same theme/custom modes and 12–22px range. Wrapping names grow the row height. |
 | **Background intensity** | How strong the wash is inside a coloured folder — the number is the opacity percentage. `0` tints the folder row only. |
 | **Take over the file list** | Turn off to restore the native tree instantly — nothing is left behind. |
 | **Sort order** | *Follow native* mirrors the sort the built-in explorer was using when Folder Nav took over (alphabetical, modified time, …). *Folders first* always puts folders above files, then sorts by name. |
@@ -95,6 +113,22 @@ Colours are always layered translucently over your theme's own background; foreg
 | **Show file extensions** | Off shows `Note` instead of `Note.md`. |
 | **Hide loose files in the vault root** | Only affects the vault root — handy when attachments pile up there. |
 | **Hidden extensions** | Comma-separated list used by the setting above. |
+
+## Border and Style Settings
+
+The following **Components → File explorer** switches control the view directly:
+
+| Border option | Behavior |
+| --- | --- |
+| **Bold folder font** | Updates folder name weight immediately. |
+| **Remove custom icon** | Hides extra list icons and disables rainbow icons; toolbar buttons and folder-entry arrows stay available. |
+| **Enable colorful folder icon** | Uses Border's eight theme colors and cycle. Full sibling positions remain stable across navigation and root-file filtering. |
+| **Untrim file names** | Wraps long file and folder names in the list; the header retains its single-line folding behavior. |
+
+Theme navigation variables supply default font sizes. A custom size overrides only
+its own region; Reset resumes inheritance. Appearance updates retain existing list
+nodes, while resize observation refits the path. Other themes use Obsidian's generic
+navigation variables; native-tree-only controls are outside these four adapters.
 
 ## How it works
 
@@ -180,6 +214,8 @@ src/
 ├── view.ts       FolderNavView — navigation state, history, list rendering
 ├── takeover.ts   Swap the built-in explorer's view for ours, and back
 ├── breadcrumb.ts Breadcrumb trail construction
+├── pathMenu.ts   Full-path menu, keyboard navigation and focus restoration
+├── border.ts     Cached Border palette mapping from full sibling positions
 ├── config.ts     Validated settings and defaults
 ├── paths.ts      Path boundaries and rename rebasing
 ├── render.ts     A single list row

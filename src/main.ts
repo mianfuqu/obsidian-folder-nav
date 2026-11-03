@@ -10,6 +10,8 @@ import { isWithin } from "./paths";
 export default class FolderNavPlugin extends Plugin {
   settings!: FolderNavSettings;
   private takeover!: FileExplorerTakeover;
+  private pendingSettings: FolderNavSettings | null = null;
+  private settingsWrite: Promise<void> | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -50,6 +52,22 @@ export default class FolderNavPlugin extends Plugin {
         return true;
       },
     });
+
+    for (const direction of ["back", "forward"] as const) {
+      this.addCommand({
+        id: `go-${direction}`,
+        name: direction === "back" ? "后退到上一个目录" : "前进到下一个历史目录",
+        checkCallback: (checking) => {
+          const view = this.getView();
+          if (!view || !(direction === "back" ? view.canGoBack : view.canGoForward)) return false;
+          if (!checking) {
+            if (direction === "back") view.goBack();
+            else view.goForward();
+          }
+          return true;
+        },
+      });
+    }
 
     this.addCommand({
       id: "reveal-active-file",
@@ -177,6 +195,12 @@ export default class FolderNavPlugin extends Plugin {
     }
   }
 
+  refreshAppearance(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      (leaf.view as FolderNavView).refreshAppearance();
+    }
+  }
+
   getView(): FolderNavView | null {
     const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     return leaf ? (leaf.view as FolderNavView) : null;
@@ -186,7 +210,27 @@ export default class FolderNavPlugin extends Plugin {
     this.settings = normalizeSettings(await this.loadData());
   }
 
-  async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+  saveSettings(): Promise<void> {
+    this.pendingSettings = {
+      ...this.settings,
+      folderColors: { ...this.settings.folderColors },
+      recentColors: [...this.settings.recentColors],
+    };
+    // Slider input can outpace disk writes. Serialize writes and retain only
+    // the latest pending snapshot so an older save never wins a race.
+    if (!this.settingsWrite) {
+      this.settingsWrite = Promise.resolve().then(async () => {
+        try {
+          while (this.pendingSettings) {
+            const snapshot = this.pendingSettings;
+            this.pendingSettings = null;
+            await this.saveData(snapshot);
+          }
+        } finally {
+          this.settingsWrite = null;
+        }
+      });
+    }
+    return this.settingsWrite;
   }
 }

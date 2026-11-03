@@ -15,6 +15,10 @@ export class FolderNavSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    new Setting(containerEl).setName("文字与显示").setHeading();
+    this.fontSizeSetting(containerEl, "pathFontSize", "路径字号");
+    this.fontSizeSetting(containerEl, "listFontSize", "文件列表字号");
+
     new Setting(containerEl)
       .setName("接管文件列表")
       .setDesc(
@@ -143,6 +147,38 @@ export class FolderNavSettingTab extends PluginSettingTab {
         });
       });
     }
+  }
+
+  private fontSizeSetting(container: HTMLElement, key: "pathFontSize" | "listFontSize", title: string): void {
+    const value = this.plugin.settings[key];
+    const setting = new Setting(container).setName(title)
+      .setDesc(value === null ? "跟随主题与 Style Settings 的导航字号。" : `${value} px · 即时预览，范围 12–22 px。`);
+    setting.addDropdown((dropdown) => dropdown
+      .addOption("theme", "跟随主题")
+      .addOption("custom", "自定义")
+      .setValue(value === null ? "theme" : "custom")
+      .onChange(async (mode) => {
+        this.plugin.settings[key] = mode === "theme" ? null : 15;
+        this.plugin.refreshAppearance();
+        await this.plugin.saveSettings();
+        this.display();
+      }));
+    if (value !== null) {
+      setting.addSlider((slider) => slider.setLimits(12, 22, 1).setValue(value).setDynamicTooltip()
+        .onChange(async (size) => {
+          this.plugin.settings[key] = size;
+          setting.setDesc(`${size} px · 即时预览，范围 12–22 px。`);
+          this.plugin.refreshAppearance();
+          await this.plugin.saveSettings();
+        }));
+    }
+    setting.addExtraButton((button) => button.setIcon("rotate-ccw").setTooltip("恢复跟随主题")
+      .onClick(async () => {
+        this.plugin.settings[key] = null;
+        this.plugin.refreshAppearance();
+        await this.plugin.saveSettings();
+        this.display();
+      }));
   }
 
   private renderColorList(containerEl: HTMLElement): void {

@@ -8,12 +8,14 @@ import {
   setIcon,
 } from "obsidian";
 import type FolderNavPlugin from "./main";
-import { buildCrumbs } from "./breadcrumb";
+import { buildCrumbs, Crumb, firstVisibleCrumb } from "./breadcrumb";
 import { addCoreFileMenuItems } from "./fileActions";
-import { ROW_TINT_ALPHA, resolveColorId, tintOf } from "./palette";
+import { ROW_TINT_ALPHA, paletteColor, resolveColorId, tintOf } from "./palette";
 import { createRow, RenderedRow, updateRow } from "./render";
 import { applyRootFilter, sortChildren } from "./sort";
 import { isWithin, parentPath, rebasePath } from "./paths";
+import { BorderFolderColors } from "./border";
+import { PathMenu } from "./pathMenu";
 
 export const VIEW_TYPE = "folder-nav-ooeooo-view";
 
@@ -28,18 +30,32 @@ export class FolderNavView extends ItemView {
   private historyIndex = 0;
   private selectedPath: string | null = null;
 
-  private backEl!: HTMLElement;
+  private backEl!: HTMLButtonElement;
+  private forwardEl!: HTMLButtonElement;
+  private upEl!: HTMLButtonElement;
+  private homeEl!: HTMLButtonElement;
   private crumbEl!: HTMLElement;
+  private crumbMeasureEl!: HTMLElement;
+  private separatorMeasureEl!: HTMLElement;
+  private overflowEl!: HTMLButtonElement;
+  private crumbs: Crumb[] = [];
+  private crumbParts: { el: HTMLElement; measure: HTMLElement }[] = [];
+  private pathMenu: PathMenu | null = null;
+  private crumbObserver: ResizeObserver | null = null;
+  private crumbFrame: number | null = null;
   private listEl!: HTMLElement;
   private emptyEl!: HTMLElement;
   private rows = new Map<string, RenderedRow>();
   private orderedPaths: string[] = [];
   private rowIndexes = new Map<string, number>();
   private frame: number | null = null;
-  private viewWindow!: Window;
+  private viewWindow!: Window & typeof globalThis;
   private opened = false;
   private crumbPath: string | null = null;
   private crumbVaultName: string | null = null;
+  private appliedPathSize: number | null | undefined;
+  private appliedListSize: number | null | undefined;
+  private borderColors = new BorderFolderColors();
 
   constructor(leaf: WorkspaceLeaf, plugin: FolderNavPlugin) {
     super(leaf);
@@ -68,11 +84,20 @@ export class FolderNavView extends ItemView {
 
     const header = root.createDiv({ cls: "folder-nav-header" });
 
-    this.backEl = header.createDiv({ cls: "folder-nav-back" });
-    setIcon(this.backEl, "arrow-left");
-    this.backEl.setAttribute("aria-label", "返回上一级");
-
     this.crumbEl = header.createDiv({ cls: "folder-nav-breadcrumb" });
+    this.crumbEl.setAttribute("role", "navigation");
+    this.crumbEl.setAttribute("aria-label", "文件夹路径");
+    const toolbar = header.createDiv({ cls: "folder-nav-toolbar" });
+    toolbar.setAttribute("role", "group");
+    toolbar.setAttribute("aria-label", "目录导航");
+    this.backEl = this.navigationButton(toolbar, "arrow-left", "后退", () => this.goBack());
+    this.forwardEl = this.navigationButton(toolbar, "arrow-right", "前进", () => this.goForward());
+    toolbar.createSpan({ cls: "folder-nav-toolbar-divider" }).setAttribute("aria-hidden", "true");
+    this.upEl = this.navigationButton(toolbar, "arrow-up", "上一级", () => this.goUp());
+    this.homeEl = this.navigationButton(toolbar, "house", "库根目录", () => this.navigateTo(ROOT));
+    this.crumbMeasureEl = header.createDiv({ cls: "folder-nav-breadcrumb-measure" });
+    this.crumbMeasureEl.setAttribute("aria-hidden", "true");
+    this.crumbMeasureEl.setAttribute("inert", "");
 
     this.listEl = root.createDiv({ cls: "folder-nav-list" });
     this.listEl.tabIndex = 0;
@@ -80,7 +105,16 @@ export class FolderNavView extends ItemView {
     this.emptyEl = root.createDiv({ cls: "folder-nav-empty" });
     this.emptyEl.hide();
 
-    this.registerDomEvent(this.backEl, "click", () => this.goBack());
+    this.registerDomEvent(this.crumbEl, "click", (event) => {
+      const target = event.target as Element | null;
+      const button = target?.closest<HTMLElement>(".folder-nav-crumb");
+      if (!button || !this.crumbEl.contains(button)) return;
+      if (button.dataset.action === "path-menu") this.openPathMenu(button);
+      else if (button.dataset.path !== undefined) {
+        this.navigateTo(button.dataset.path);
+        this.listEl.focus();
+      }
+    });
     this.registerDomEvent(this.listEl, "click", (evt) => {
       const file = this.fileAtEvent(evt);
       if (file) this.openEntry(file);
@@ -101,21 +135,47 @@ export class FolderNavView extends ItemView {
       this.plugin.app.vault.on("rename", (file, oldPath) => this.onRenamed(file, oldPath))
     );
     this.registerEvent(this.plugin.app.vault.on("modify", (file) => {
-      if (this.plugin.settings.sortMode === "native" &&
-          this.plugin.settings.nativeSortOrder.startsWith("by-modified-time") &&
-          this.parentPathOf(file) === this.currentPath) this.refresh();
+      if (this.plugin.settings.nativeSortOrder.startsWith("by-modified-time")) {
+        this.borderColors.invalidate();
+        if (isWithin(this.currentPath, this.parentPathOf(file))) this.refresh();
+      }
     }));
     this.registerEvent(
       this.plugin.app.workspace.on("file-open", (file) => this.onFileOpen(file))
     );
+    this.registerEvent(this.plugin.app.workspace.on("css-change", () => this.requestBreadcrumbLayout()));
+    if (this.viewWindow.ResizeObserver) {
+      this.crumbObserver = new this.viewWindow.ResizeObserver(() => this.requestBreadcrumbLayout());
+      this.crumbObserver.observe(this.crumbEl);
+      // Natural text width also changes with theme fonts, font size and font loading.
+      this.crumbObserver.observe(this.crumbMeasureEl);
+    } else {
+      this.registerDomEvent(this.viewWindow, "resize", () => this.requestBreadcrumbLayout());
+    }
 
     this.render();
     this.listEl.focus();
   }
 
+  private navigationButton(parent: HTMLElement, icon: string, label: string, action: () => void): HTMLButtonElement {
+    const button = parent.createEl("button", { cls: "folder-nav-nav-button", type: "button" });
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    setIcon(button, icon);
+    this.registerDomEvent(button, "click", action);
+    return button;
+  }
+
   async onClose(): Promise<void> {
     this.opened = false;
     this.cancelRefresh();
+    if (this.crumbFrame !== null) this.viewWindow.cancelAnimationFrame(this.crumbFrame);
+    this.crumbFrame = null;
+    this.crumbObserver?.disconnect();
+    this.crumbObserver = null;
+    this.pathMenu?.close();
+    this.crumbParts = [];
+    this.crumbs = [];
     this.rows.clear();
     this.rowIndexes.clear();
     this.orderedPaths = [];
@@ -128,12 +188,11 @@ export class FolderNavView extends ItemView {
 
   navigateTo(path: string, pushHistory = true): void {
     const target = this.normalize(path);
-    if (target !== this.currentPath) {
-      if (pushHistory) {
-        this.history = this.history.slice(0, this.historyIndex + 1);
-        this.history.push(target);
-        this.historyIndex = this.history.length - 1;
-      }
+    if (target === this.currentPath) return;
+    if (pushHistory) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+      this.history.push(target);
+      this.historyIndex = this.history.length - 1;
     }
     this.currentPath = target;
     this.select(null, false);
@@ -151,8 +210,18 @@ export class FolderNavView extends ItemView {
   }
 
   goBack(): void {
-    if (this.historyIndex <= 0) return;
-    this.historyIndex -= 1;
+    if (this.canGoBack) this.visitHistory(this.historyIndex - 1);
+  }
+
+  goForward(): void {
+    if (this.canGoForward) this.visitHistory(this.historyIndex + 1);
+  }
+
+  get canGoBack(): boolean { return this.historyIndex > 0; }
+  get canGoForward(): boolean { return this.historyIndex < this.history.length - 1; }
+
+  private visitHistory(index: number): void {
+    this.historyIndex = index;
     this.currentPath = this.normalize(this.history[this.historyIndex]);
     this.history[this.historyIndex] = this.currentPath;
     this.select(null, false);
@@ -165,7 +234,7 @@ export class FolderNavView extends ItemView {
    * reveal, and stealing focus from the editor mid-typing would be hostile.
    */
   private focusIfEngaged(): void {
-    if (this.containerEl.contains(this.contentEl.ownerDocument.activeElement)) this.listEl.focus();
+    if (this.listEl.contains(this.contentEl.ownerDocument.activeElement)) this.listEl.focus();
   }
 
   goUp(): void {
@@ -206,10 +275,38 @@ export class FolderNavView extends ItemView {
 
   render(): void {
     this.cancelRefresh();
-    this.renderBreadcrumb();
+    const appearanceChanged = this.applyAppearance();
+    this.renderBreadcrumb(appearanceChanged);
     this.renderList();
     this.applyWash();
-    this.backEl.toggleClass("is-disabled", this.historyIndex <= 0);
+    this.backEl.disabled = !this.canGoBack;
+    this.forwardEl.disabled = !this.canGoForward;
+    this.upEl.disabled = this.currentPath === ROOT;
+    this.homeEl.disabled = this.currentPath === ROOT;
+  }
+
+  refreshAppearance(): void {
+    if (!this.opened) return;
+    this.applyAppearance();
+    this.requestBreadcrumbLayout();
+  }
+
+  private applyAppearance(): boolean {
+    let changed = false;
+    const {pathFontSize, listFontSize} = this.plugin.settings;
+    if (pathFontSize !== this.appliedPathSize) {
+      this.appliedPathSize = pathFontSize;
+      if (pathFontSize === null) this.contentEl.style.removeProperty("--fn-path-size");
+      else this.contentEl.style.setProperty("--fn-path-size", `${pathFontSize}px`);
+      changed = true;
+    }
+    if (listFontSize !== this.appliedListSize) {
+      this.appliedListSize = listFontSize;
+      if (listFontSize === null) this.contentEl.style.removeProperty("--fn-list-size");
+      else this.contentEl.style.setProperty("--fn-list-size", `${listFontSize}px`);
+      changed = true;
+    }
+    return changed;
   }
 
   /**
@@ -241,27 +338,74 @@ export class FolderNavView extends ItemView {
     return folder instanceof TFolder ? folder : this.plugin.app.vault.getRoot();
   }
 
-  private renderBreadcrumb(): void {
+  private renderBreadcrumb(appearanceChanged = false): void {
     const vaultName = this.plugin.app.vault.getName();
-    if (this.crumbPath === this.currentPath && this.crumbVaultName === vaultName) return;
+    if (this.crumbPath === this.currentPath && this.crumbVaultName === vaultName) {
+      if (appearanceChanged) this.layoutBreadcrumb();
+      return;
+    }
+    this.pathMenu?.close();
     this.crumbPath = this.currentPath;
     this.crumbVaultName = vaultName;
     this.crumbEl.empty();
-    const crumbs = buildCrumbs(vaultName, this.currentPath);
-
-    crumbs.forEach((crumb, index) => {
-      const isLast = index === crumbs.length - 1;
-      const el = this.crumbEl.createDiv({ cls: "folder-nav-crumb", text: crumb.label });
-      if (isLast) {
-        el.addClass("is-current");
-      } else {
-        el.addEventListener("click", () => this.navigateTo(crumb.path));
-        this.crumbEl.createSpan({ cls: "folder-nav-crumb-sep", text: "›" });
-      }
+    this.crumbMeasureEl.empty();
+    this.crumbs = buildCrumbs(vaultName, this.currentPath);
+    this.crumbEl.title = this.crumbs.map((crumb) => crumb.label).join(" / ");
+    this.overflowEl = this.crumbEl.createEl("button", {
+      cls: "folder-nav-crumb folder-nav-path-overflow", type: "button",
     });
+    this.overflowEl.dataset.action = "path-menu";
+    this.overflowEl.setAttribute("aria-label", "展开完整路径");
+    this.overflowEl.setAttribute("aria-haspopup", "menu");
+    this.overflowEl.setAttribute("aria-expanded", "false");
+    this.overflowEl.title = "完整路径";
+    setIcon(this.overflowEl, "ellipsis");
+    this.separatorMeasureEl = this.crumbMeasureEl.createSpan({ cls: "folder-nav-crumb-sep", text: "›" });
+    this.crumbParts = this.crumbs.map((crumb, index) => {
+      const isLast = index === this.crumbs.length - 1;
+      const part = this.crumbEl.createSpan({ cls: "folder-nav-crumb-part" });
+      if (isLast) part.addClass("is-current");
+      if (index > 0) part.createSpan({ cls: "folder-nav-crumb-sep", text: "›" }).setAttribute("aria-hidden", "true");
+      const button = part.createEl("button", { cls: "folder-nav-crumb", text: crumb.label, type: "button" });
+      button.dataset.path = crumb.path;
+      button.title = crumb.path || crumb.label;
+      const measure = this.crumbMeasureEl.createEl("button", { cls: "folder-nav-crumb", text: crumb.label, type: "button" });
+      measure.tabIndex = -1;
+      if (isLast) {
+        button.addClass("is-current");
+        measure.addClass("is-current");
+        button.setAttribute("aria-current", "location");
+      }
+      return {el: part, measure};
+    });
+    this.layoutBreadcrumb();
+  }
 
-    // A long trail should show the deepest crumb, not the vault name.
-    this.crumbEl.scrollLeft = this.crumbEl.scrollWidth;
+  private requestBreadcrumbLayout(): void {
+    if (!this.opened || this.crumbFrame !== null) return;
+    this.crumbFrame = this.viewWindow.requestAnimationFrame(() => {
+      this.crumbFrame = null;
+      if (this.opened) this.layoutBreadcrumb();
+    });
+  }
+
+  private layoutBreadcrumb(): void {
+    if (!this.crumbParts.length) return;
+    const widths = this.crumbParts.map((part) => part.measure.getBoundingClientRect().width);
+    const separator = this.separatorMeasureEl.getBoundingClientRect().width;
+    const start = firstVisibleCrumb(widths, this.crumbEl.clientWidth, 32, separator);
+    this.crumbEl.toggleClass("is-compact", start > 0 && this.crumbParts.length - start === 2);
+    this.overflowEl.hidden = start === 0;
+    this.crumbParts.forEach((part, index) => { part.el.hidden = index < start; });
+    if (start === 0) this.pathMenu?.close();
+  }
+
+  private openPathMenu(anchor: HTMLElement): void {
+    if (this.pathMenu) { this.pathMenu.close(true); return; }
+    anchor.setAttribute("aria-expanded", "true");
+    this.pathMenu = new PathMenu(anchor, this.crumbs, this.plugin.settings.pathFontSize,
+      (path) => { this.navigateTo(path); this.listEl.focus(); },
+      () => { this.pathMenu = null; anchor.setAttribute("aria-expanded", "false"); });
   }
 
   private renderList(): void {
@@ -280,7 +424,12 @@ export class FolderNavView extends ItemView {
     let cursor = this.listEl.firstElementChild;
     let additions: DocumentFragment | null = null;
     for (const file of children) {
-      const options = { showExtensions: settings.showExtensions, tint: this.tintFor(file) };
+      const manual = file instanceof TFolder ? paletteColor(resolveColorId(settings.folderColors, file.path)) : null;
+      const options = {
+        showExtensions: settings.showExtensions, tint: this.tintFor(file),
+        borderColor: file instanceof TFolder ? this.borderColors.colorFor(file, settings) : "currentColor",
+        manualColor: manual?.hex ?? null,
+      };
       let row = this.rows.get(file.path);
       // Delete/create can replace a file with a folder at the same path before
       // the scheduled frame runs. Its structure must then be recreated.
@@ -353,6 +502,21 @@ export class FolderNavView extends ItemView {
   }
 
   private onKeyDown(evt: KeyboardEvent): void {
+    const target = evt.target as HTMLElement | null;
+    if (target?.closest("input, textarea, [contenteditable=true]")) return;
+    if ((evt.altKey || evt.metaKey) && evt.key === "ArrowLeft" ||
+        (evt.metaKey || evt.ctrlKey) && evt.key === "[" || evt.key === "Backspace" && !evt.shiftKey) {
+      evt.preventDefault(); this.goBack(); return;
+    }
+    if ((evt.altKey || evt.metaKey) && evt.key === "ArrowRight" ||
+        (evt.metaKey || evt.ctrlKey) && evt.key === "]" || evt.key === "Backspace" && evt.shiftKey) {
+      evt.preventDefault(); this.goForward(); return;
+    }
+    if (evt.altKey && evt.key === "ArrowUp") {
+      evt.preventDefault(); this.goUp(); return;
+    }
+    // Native button Enter/Space activation must not also open a selected file.
+    if (!this.listEl.contains(target)) return;
     const ordered = this.orderedPaths;
     if (ordered.length === 0) return;
 
@@ -377,25 +541,12 @@ export class FolderNavView extends ItemView {
         if (file) this.openEntry(file);
         return;
       }
-      case "Backspace":
-      case "ArrowLeft": {
-        // Backspace would otherwise navigate the whole app backwards.
-        if (evt.key === "Backspace" || evt.altKey || evt.metaKey) {
-          evt.preventDefault();
-          this.goBack();
-        }
-        return;
-      }
       case "Escape": {
         this.select(null);
         return;
       }
     }
 
-    if (evt.key === "[" && (evt.metaKey || evt.ctrlKey)) {
-      evt.preventDefault();
-      this.goBack();
-    }
   }
 
   private showMenu(event: MouseEvent, file: TAbstractFile): void {
@@ -428,6 +579,7 @@ export class FolderNavView extends ItemView {
   }
 
   private onVaultChanged(file: TAbstractFile): void {
+    this.borderColors.invalidate();
     // Standing in a folder that just got deleted — retreat to the nearest
     // ancestor that still exists.
     if (isWithin(this.currentPath, file.path)) {
@@ -439,6 +591,7 @@ export class FolderNavView extends ItemView {
   }
 
   private onRenamed(file: TAbstractFile, oldPath: string): void {
+    this.borderColors.invalidate();
     const oldCurrent = this.currentPath;
     // Rebase all history, even when the renamed folder is not currently open.
     this.history = this.history.map((path) => rebasePath(path, oldPath, file.path));

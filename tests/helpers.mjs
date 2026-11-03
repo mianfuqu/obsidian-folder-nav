@@ -9,9 +9,18 @@ export function resetMetrics() {
 
 const frames = new Map();
 let frameId = 0;
+export const resizeObservers = new Set();
+class ResizeObserver {
+  constructor(callback) { this.callback = callback; this.targets = new Set(); resizeObservers.add(this); }
+  observe(target) { this.targets.add(target); }
+  disconnect() { this.targets.clear(); resizeObservers.delete(this); }
+}
 export const viewWindow = {
   requestAnimationFrame(callback) { frames.set(++frameId, callback); return frameId; },
   cancelAnimationFrame(id) { frames.delete(id); },
+  ResizeObserver,
+  innerWidth: 1024, innerHeight: 800,
+  addEventListener() {}, removeEventListener() {},
 };
 export function flushFrames() {
   const callbacks = [...frames.values()];
@@ -33,7 +42,10 @@ export class Element {
     this.classes = new Set((options.cls ?? "").split(" ").filter(Boolean));
     this.textContent = options.text ?? "";
     this.events = new Map();
-    this.style = { setProperty() {}, removeProperty() {} };
+    const styles = new Map();
+    this.style = { setProperty(name, value) { styles.set(name, value); },
+      removeProperty(name) { styles.delete(name); }, getPropertyValue(name) { return styles.get(name) ?? ""; } };
+    this.attributes = new Map();
     this.scrollTop = 0;
   }
   createDiv(options = {}) { return this.appendChild(new Element(options)); }
@@ -71,7 +83,17 @@ export class Element {
   removeClass(value) { metrics.classes++; this.classes.delete(value); }
   toggleClass(value, enabled) { metrics.classes++; if (enabled) this.classes.add(value); else this.classes.delete(value); }
   setText(text) { this.textContent = text; }
-  setAttribute() {}
+  setAttribute(name, value) { this.attributes.set(name, value); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
+  get clientWidth() { return this._clientWidth ?? 240; }
+  set clientWidth(value) { this._clientWidth = value; }
+  getBoundingClientRect() {
+    const width = this.classes.has("folder-nav-crumb-sep") ? 16
+      : this.classes.has("folder-nav-path-menu") ? 360
+      : this.textContent.length * 8 + 8;
+    return {x: 0, y: 0, left: 0, top: 0, width, height: this.children.length * 20 + 32,
+      right: width, bottom: 32};
+  }
   hide() { this.hidden = true; }
   show() { this.hidden = false; }
   focus() { document.activeElement = this; }
@@ -81,6 +103,7 @@ export class Element {
     return false;
   }
   closest(selector) {
+    if (!selector.startsWith(".")) return null;
     const name = selector.replace(/^\./, "");
     for (let current = this; current; current = current.parentElement) if (current.classes.has(name)) return current;
     return null;
@@ -105,7 +128,9 @@ const document = {
   defaultView: viewWindow,
   activeElement: null,
   createDocumentFragment() { return new Element({}, true); },
+  addEventListener() {}, removeEventListener() {},
 };
+document.body = new Element();
 
 export class TAbstractFile {
   constructor(path) { this.path = path; this.name = path.split("/").at(-1); this.parent = null; }
@@ -170,6 +195,9 @@ export async function loadPlugin() {
         'export * from "./src/view.ts";',
         'export * from "./src/fileActions.ts";',
         'export * from "./src/takeover.ts";',
+        'export * from "./src/breadcrumb.ts";',
+        'export * from "./src/border.ts";',
+        'export { default as FolderNavPlugin } from "./src/main.ts";',
       ].join("\n"),
       resolveDir: fileURLToPath(new URL("..", import.meta.url)),
     },

@@ -42,6 +42,8 @@ function displayName(file: TAbstractFile, showExtensions: boolean): string {
 export interface RowOptions {
   showExtensions: boolean;
   tint: string | null;
+  borderColor: string;
+  manualColor: string | null;
 }
 
 export interface RenderedRow {
@@ -52,6 +54,8 @@ export interface RenderedRow {
   name: string;
   icon: string;
   tint: string | null;
+  borderColor: string;
+  manualColor: string | null;
 }
 
 export function createRow(file: TAbstractFile, options: RowOptions): RenderedRow {
@@ -70,13 +74,22 @@ export function createRow(file: TAbstractFile, options: RowOptions): RenderedRow
     setIcon(chevron, "chevron-right");
   }
 
-  const result: RenderedRow = { el: row, isFolder, nameEl, iconEl, name: "", icon: "", tint: null };
+  const result: RenderedRow = { el: row, isFolder, nameEl, iconEl, name: "", icon: "", tint: null, borderColor: "", manualColor: null };
   updateRow(result, file, options);
   return result;
 }
 
 /** Retain DOM nodes and SVGs when a vault event leaves their content unchanged. */
 export function updateRow(row: RenderedRow, file: TAbstractFile, options: RowOptions): void {
+  if (row.borderColor !== options.borderColor) {
+    row.borderColor = options.borderColor;
+    row.el.style.setProperty("--fn-border-color", options.borderColor);
+  }
+  if (row.manualColor !== options.manualColor) {
+    row.manualColor = options.manualColor;
+    if (options.manualColor) row.el.style.setProperty("--fn-manual-icon-color", options.manualColor);
+    else row.el.style.removeProperty("--fn-manual-icon-color");
+  }
   const name = displayName(file, options.showExtensions);
   if (row.name !== name) {
     row.name = name;

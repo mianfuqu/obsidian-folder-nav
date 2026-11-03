@@ -1,13 +1,13 @@
 {
   "name": "folder-nav-ooeooo",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Drill-down folder navigation for Obsidian's sidebar",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "npm run check && node esbuild.config.mjs production",
     "check": "tsc --noEmit",
-    "test": "node --test tests/plugin.test.mjs tests/build.test.mjs tests/release.test.mjs"
+    "test": "node --test tests/plugin.test.mjs tests/navigation.test.mjs tests/appearance.test.mjs tests/build.test.mjs tests/release.test.mjs"
   },
   "engines": {
     "node": ">=18"

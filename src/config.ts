@@ -13,6 +13,9 @@ export interface FolderNavSettings {
   folderColors: Record<string, string>;
   recentColors: string[];
   colorWash: number;
+  /** null follows the theme; numeric values explicitly override it in pixels. */
+  pathFontSize: number | null;
+  listFontSize: number | null;
 }
 
 export const DEFAULT_SETTINGS: FolderNavSettings = {
@@ -26,6 +29,8 @@ export const DEFAULT_SETTINGS: FolderNavSettings = {
   folderColors: {},
   recentColors: [],
   colorWash: 14,
+  pathFontSize: null,
+  listFontSize: null,
 };
 
 const SORT_ORDERS = new Set([
@@ -57,6 +62,12 @@ export function normalizeSettings(value: unknown): FolderNavSettings {
   if (typeof stored.hiddenExtensions === "string") settings.hiddenExtensions = stored.hiddenExtensions;
   if (typeof stored.colorWash === "number" && Number.isFinite(stored.colorWash)) {
     settings.colorWash = Math.max(0, Math.min(50, stored.colorWash));
+  }
+  for (const key of ["pathFontSize", "listFontSize"] as const) {
+    const size = stored[key];
+    if (typeof size === "number" && Number.isFinite(size)) {
+      settings[key] = Math.max(12, Math.min(22, Math.round(size)));
+    }
   }
   if (isRecord(stored.folderColors)) {
     for (const [path, id] of Object.entries(stored.folderColors)) {
