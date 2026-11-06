@@ -5,7 +5,7 @@
     "target": "ES2018",
     "moduleResolution": "node",
     "lib": ["DOM", "DOM.Iterable", "ES2018"],
-    "types": ["node"],
+    "types": [],
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,

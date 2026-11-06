@@ -11,6 +11,33 @@
   <img src="assets/demo-nested.png" width="300" alt="进入文件夹后:顶部显示面包屑路径">
 </p>
 
+## 分支身份与旧版本迁移
+
+这是 [Folder Nav](https://github.com/mianfuqu/obsidian-folder-nav) 的独立分支。
+从 `0.2.5` 起，插件 ID 为 **`folder-nav-ooeooo`**；从 `0.2.7` 起，显示名称为
+**Folder Nav**。显示名称与原版相同，但 Obsidian 按独立插件 ID
+`folder-nav-ooeooo` 识别更新来源，与官方插件库中的 `folder-nav` 分开。
+Obsidian 不会再用官方 `folder-nav` 的版本覆盖这个分支。
+后续请从[本仓库 Releases](https://github.com/Obsidian-Projects/obsidian-folder-nav/releases)更新。
+
+1. 在 Obsidian 中禁用旧的 Folder Nav；如需保留设置，先备份
+   `.obsidian/plugins/folder-nav/data.json`（如果存在）。
+2. 卸载旧插件，或将整个 `folder-nav` 目录移出 `.obsidian/plugins/`。
+   仅禁用旧插件仍可能看到它的官方更新提示。
+3. 解压新版 ZIP，将 `folder-nav-ooeooo` 文件夹放入 `.obsidian/plugins/`。
+   如有设置备份，将 `data.json` 复制到新文件夹中。
+4. 重启 Obsidian，在第三方插件列表启用 **Folder Nav**。
+   插件 ID 已改变，原来绑定的快捷键需要重新绑定。
+
+请勿同时启用本分支与旧版 Folder Nav；两者都会接管原生文件列表。
+`versions.json` 只列出采用新 ID 的版本，旧版本保留在 Release 历史中。
+
+更新本分支时，请先**彻底退出 Obsidian**，同时覆盖
+`.obsidian/plugins/folder-nav-ooeooo/` 中的 **`main.js`、`manifest.json`、`styles.css`**，
+再重新启动 Obsidian。保留 `data.json` 即可保留设置。如果设置侧栏仍显示
+`Folder Nav (ooeooo)`，请确认该目录的 `manifest.json` 中名称为
+`"name": "Folder Nav"`，并彻底重启应用；只替换 `main.js` 或开关插件可能保留旧名称缓存。
+
 ## 为什么
 
 Obsidian 自带的文件列表每一层都往里缩进。到了第三、四层 —— `笔记 › 课程 › 第三周 › 讲义.pdf` —— 文件名已经被挤成一条缝,而且整棵树永远摊在屏幕上跟你抢注意力。
@@ -21,6 +48,14 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 
 默认开启:它会接管自带的**文件列表**视图。侧栏标签页没变,左侧图标栏的那个按钮也照常工作。
 
+顶部采用两行布局：第一行显示路径，第二行提供 **后退 / 前进 / 上一级 / 库根目录**。
+路径中的库根目录以家图标显示，名称保留在悬停提示和完整路径菜单中。
+两行均占满侧栏可用宽度。第一行路径居左，每一级按文字宽度紧凑排列，空间不足时才收缩，
+不拉伸单个目录或在层级之间分配空白；第二行四个导航按钮等分空间。
+路径会根据侧栏宽度优先保留最近两级，较远的祖先目录收进 `…`。
+点击 `…` 可以展开完整路径菜单；菜单可超出侧栏，每一级都能跳转，长名称可换行。
+字号、主题字体或侧栏宽度变化后，路径会自动重新适配。
+
 **鼠标**
 
 | 操作 | 结果 |
@@ -28,7 +63,8 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 | 点文件夹 | 进入该文件夹 |
 | 点文件 | 在**主编辑区**打开(绝不会占用侧栏) |
 | 点面包屑上的任意一段 | 跳回那一层 |
-| 点 `←` | 返回上一级 |
+| 点 `←` / `→` | 按访问历史后退 / 前进 |
+| 点 `↑` / 根目录按钮 | 进入父目录 / 回到库根目录 |
 | 右键文件或文件夹 | **新建笔记** / **新建文件夹**、**重命名**、**移动文件夹到…**、**创建副本**、**删除** —— 以及其他插件贡献的菜单项 |
 
 > Obsidian 的核心右键菜单项是**文件列表自己的代码**在触发 `file-menu` 事件**之前**加进去的,所以监听这个事件的插件只能拿到第三方贡献项。Folder Nav 既然替换了那个视图,就得用公开 API 把这些核心项重建出来。其中**删除**直接交给 Obsidian 自己的 `promptForDeletion`,所以你的「删除前确认」设置是生效的。
@@ -39,14 +75,25 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 | --- | --- |
 | `↑` / `↓` | 移动选中 |
 | `Enter` | 打开选中项 |
-| `Backspace` / `Alt+←` / `Cmd/Ctrl+[` | 返回上一级 |
+| `Backspace` / `Alt+←` / `Cmd/Ctrl+[` | 历史后退 |
+| `Shift+Backspace` / `Alt+→` / `Cmd/Ctrl+]` | 历史前进 |
+| `Alt+↑` | 返回父目录 |
 | `Esc` | 取消选中 |
+
+后退后进入新目录会清除原来的前进记录；重复进入当前位置不会新增历史。
+路径菜单支持方向键、Home/End、Enter 和 Esc，关闭菜单后可回到触发按钮。
+
+当前目录、前进后退记录、选中项和列表滚动位置保存在插件的 `data.json` 中；
+重新打开导航视图或重启 Obsidian 后会恢复。如果保存的目录已不存在，会回到最近的现存上级。
+开启「自动定位当前文件」时，之后切换笔记仍会跳转到对应的文件夹。
 
 **命令**(也可以在 设置 → 快捷键 里自行绑定)
 
 - `Folder Nav: 切换逐层导航 / 原生文件列表`
 - `Folder Nav: 回到库根目录`
 - `Folder Nav: 返回上一级文件夹`
+- `Folder Nav: 后退到上一个目录`
+- `Folder Nav: 前进到下一个历史目录`
 - `Folder Nav: 定位到当前文件`
 
 ## 文件夹颜色
@@ -62,12 +109,15 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 
 **管理颜色** —— 设置 → Folder Nav → 文件夹颜色 会列出所有已上色的文件夹,旁边有「背景染色强度」滑块。设为 `0` 时只染文件夹那一行,列表背景不动。
 
-颜色一律是**半透明叠在你主题自己的背景之上**,从不改动前景色 —— 所以文字清晰度完全由你的主题决定,不会因为染色而看不清。
+手动颜色用于文件夹图标和半透明背景；文字继续跟随主题。
+主题的悬停和选中背景优先于手动行染色。清除手动颜色后恢复主题的自动配色。
 
 ## 设置
 
 | 项 | 说明 |
 | --- | --- |
+| **路径字号** | 默认跟随主题。可切换到 12–22px 自定义字号，即时预览；重置按钮恢复主题。 |
+| **文件列表字号** | 与路径字号独立设置，默认跟随主题，范围 12–22px。长名称换行时行高自动增长。 |
 | **背景染色强度** | 进入已上色文件夹时背景染色的浓度,数值就是透明度百分比。`0` 只染文件夹那一行。 |
 | **接管文件列表** | 关掉立刻恢复原生树,不留任何痕迹。 |
 | **排序方式** | *跟随原生* 套用接管时内置文件列表正在用的排序(字母序、修改时间等);*文件夹优先* 始终把文件夹排在文件前面,再按名称排。 |
@@ -75,6 +125,21 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 | **显示文件扩展名** | 关掉后 `笔记.md` 显示为 `笔记`。 |
 | **在库根目录隐藏散落文件** | 只影响库的根目录 —— 附件在根目录堆积时很好用。 |
 | **隐藏的扩展名** | 逗号分隔,配合上一项使用。 |
+
+## Border 与 Style Settings
+
+直接跟随 Border 的 **Components → 文件列表** 开关，无需再维护另一套相同设置：
+
+| Border 选项 | 行为 |
+| --- | --- |
+| **加粗文件夹字体** | 即时改变文件夹名称字重。 |
+| **移除自定义图标** | 隐藏列表额外图标，同时停用多彩图标；四个导航按钮和文件夹进入提示保留。 |
+| **启用多彩文件夹图标** | 使用 Border 的八色主题变量及循环规则。颜色按完整同级目录顺序计算，导航和根目录筛选不会重新编号。 |
+| **不修剪文件名** | 列表中的长文件名、文件夹名换行；顶部路径保持单行折叠。 |
+
+默认字号使用主题的导航变量；选择自定义字号后，仅覆盖对应区域，重置即可恢复跟随。
+主题与外观变化通过 CSS 和路径尺寸检测生效，已有列表节点会保留。
+其他主题继续使用 Obsidian 的通用导航变量；原生文件树专有控件不属于这四项适配范围。
 
 ## 工作原理
 
@@ -96,24 +161,56 @@ Folder Nav 替换的是文件列表 **leaf 里的那个视图**,而不是禁用 
 ## 开发
 
 ```bash
-npm install
+npm ci
+npm run check     # TypeScript 类型检查
+npm test          # Node 内置测试运行器执行回归测试
 npm run build     # 类型检查 + 打包
 npm run dev       # 监听模式
 ```
 
+开发需要 Node.js 18 或更高版本。工具链只保留 TypeScript、esbuild 和官方
+Obsidian API 类型包三个直接依赖。默认不再安装 ESLint 及其 Obsidian 规则，
+类型检查与行为测试分别执行。插件运行时只导入 Obsidian。
+
+列表会复用已有行节点和 SVG 图标，统一处理行事件，并将同一帧内的文件事件合并刷新。
+键盘选择只更新前后两行；根目录文件先过滤再排序，扩展名规则解析后复用。
+测试使用 DOM 替身检查节点分配和事件批量刷新，并实际验证生产构建和监听构建；
+这些检查不包含浏览器布局耗时，仍需在 Obsidian 内验证实际交互。
+
 `main.js` 输出在项目根目录。开发时想顺便复制进某个库:
 
 ```bash
-OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav npm run build
+OBSIDIAN_PLUGIN_DIR=~/MyVault/.obsidian/plugins/folder-nav-ooeooo npm run build
 ```
+
+监听模式也会在每次成功重新构建后复制到该目录。生产构建不再写入时间戳，
+相同源码会生成相同的打包文件。
 
 如果你装了 Obsidian CLI,调试闭环是这样:
 
 ```bash
-obsidian vault=MyVault plugin:reload id=folder-nav
+obsidian vault=MyVault plugin:reload id=folder-nav-ooeooo
 obsidian vault=MyVault dev:errors
 obsidian vault=MyVault dev:screenshot path=/tmp/shot.png
 ```
+
+### GitHub 自动发布
+
+将 `.github/` 目录及本次修改提交到仓库。更新 `manifest.json` 的 `version`
+并推送到 GitHub 默认分支后，`Release Obsidian plugin` 工作流会自动执行
+`npm ci`、回归测试和构建，再创建与插件版本完全相同的标签和 Release
+(例如 `0.2.4`，不加 `v`)。只修改描述等字段不会发布，版本回退会报错。
+插件版本以 `manifest.json` 为准，不取 `package.json` 的版本。
+
+Release 包含 `main.js`、`manifest.json`、`styles.css`、可直接解压安装的
+`folder-nav-ooeooo-版本号.zip` 和 `SHA256SUMS.txt`。文件先上传到草稿，成功后才公开；
+重跑不会覆盖已经发布的 Release。也可以在 Actions 中手动运行此工作流，
+补发默认分支的当前版本。
+
+使用 GitHub 自带的 `GITHUB_TOKEN`，无需配置个人令牌。仓库须启用 Actions，
+且仓库或组织策略允许工作流使用 `contents: write` 创建 Release。
+每次更新插件版本时，也请同步维护根目录 `versions.json` 中的版本与最低
+Obsidian 版本映射，供旧版 Obsidian 查找兼容的历史版本。
 
 ### 源码结构
 
@@ -123,6 +220,10 @@ src/
 ├── view.ts       FolderNavView —— 导航状态、历史栈、列表渲染
 ├── takeover.ts   把内置文件列表的视图换成我们的,以及换回去
 ├── breadcrumb.ts 面包屑路径构建
+├── pathMenu.ts   完整路径菜单、键盘操作与焦点恢复
+├── border.ts     Border 八色目录位置映射与缓存
+├── config.ts     默认设置与输入校验
+├── paths.ts      路径边界判断与重命名迁移
 ├── render.ts     单个列表行
 ├── palette.ts    文件夹调色板与就近继承查找
 ├── colorPicker.ts 取色弹窗
@@ -132,7 +233,8 @@ src/
 
 ## 贡献者
 
-- **mianfuqu** —— 作者与维护者
+- **mianfuqu** —— 原版作者
+- **ooeooo** —— 分支维护
 - **[DeepSeek](https://www.deepseek.com/)** —— 实现
 
 详见 [CONTRIBUTORS.md](CONTRIBUTORS.md)。

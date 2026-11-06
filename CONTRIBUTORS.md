@@ -1,9 +1,10 @@
 # Contributors
 
-- **mianfuqu** — author and maintainer
+- **mianfuqu** — original author
+- **ooeooo** — fork maintainer
 - **[DeepSeek](https://www.deepseek.com/)** — implementation
 
-## How this plugin was built
+## How the original plugin was built
 
 Folder Nav was written in pair-programming sessions: the maintainer set the
 direction, made the product decisions (drill-down over a tree, colours that

@@ -1,20 +1,21 @@
 {
-  "name": "folder-nav",
-  "version": "0.1.0",
+  "name": "folder-nav-ooeooo",
+  "version": "0.2.9",
   "description": "Drill-down folder navigation for Obsidian's sidebar",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit && node esbuild.config.mjs production",
-    "lint": "eslint src/"
+    "build": "npm run check && node esbuild.config.mjs production",
+    "check": "tsc --noEmit",
+    "test": "node --test tests/plugin.test.mjs tests/navigation.test.mjs tests/appearance.test.mjs tests/build.test.mjs tests/release.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^22.20.3",
-    "esbuild": "^0.28.2",
-    "eslint": "^9.39.5",
-    "eslint-plugin-obsidianmd": "^0.4.2",
-    "obsidian": "1.13.1",
-    "typescript": "^5.6.0"
+    "esbuild": "0.28.2",
+    "obsidian": "1.14.4",
+    "typescript": "5.9.3"
   }
 }

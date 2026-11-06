@@ -7,86 +7,182 @@
   height: 100%;
   padding: 0;
   overflow: hidden;
+  min-width: 0;
+  font-family: var(--font-interface, inherit);
+  container-type: inline-size;
 }
 
 /* ------------------------------------------------------------------ header */
 
 .folder-nav-header {
+  position: relative;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  box-sizing: border-box;
   gap: 4px;
   flex: 0 0 auto;
-  padding: 6px 8px;
+  padding: 7px 8px 6px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.folder-nav-back {
+.folder-nav-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: clamp(2px, 2cqi, 6px);
+}
+
+.folder-nav .folder-nav-nav-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 100%;
+  max-width: 100%;
+  height: 32px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
   border-radius: var(--radius-s);
   color: var(--text-muted);
   cursor: pointer;
 }
 
-.folder-nav-back:hover {
+.folder-nav .folder-nav-nav-button:hover:not(:disabled) {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.folder-nav-back.is-disabled {
-  opacity: 0.35;
+.folder-nav .folder-nav-nav-button:disabled {
+  opacity: 0.4;
   cursor: default;
   background: none;
 }
 
-.folder-nav-back .svg-icon {
-  width: 16px;
-  height: 16px;
+.folder-nav-nav-button .svg-icon {
+  width: min(18px, 80%);
+  height: 18px;
 }
 
 .folder-nav-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 1px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
-  scrollbar-width: none;
-}
-
-.folder-nav-breadcrumb::-webkit-scrollbar {
-  display: none;
-}
-
-.folder-nav-crumb {
+  justify-content: flex-start;
+  gap: 0;
+  width: 100%;
   flex: 0 0 auto;
-  padding: 1px 4px;
+  min-width: 0;
+  min-height: 30px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--fn-path-size, var(--nav-item-size, var(--font-ui-small, 15px)));
+}
+
+.folder-nav-breadcrumb [hidden] {
+  display: none !important;
+}
+
+.folder-nav-crumb-part {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.folder-nav-crumb-part.is-current {
+  max-width: 100%;
+}
+
+.folder-nav-crumb-part.is-root {
+  flex: 0 0 auto;
+}
+
+.folder-nav .folder-nav-crumb {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 28px;
+  padding: 3px 4px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
   border-radius: var(--radius-s);
-  font-size: var(--font-ui-smaller);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--nav-item-weight, 400);
+  line-height: 1.45;
+  text-align: left;
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.folder-nav-crumb:hover {
+.folder-nav .folder-nav-crumb:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.folder-nav-crumb.is-current {
+.folder-nav .folder-nav-crumb.is-current {
   color: var(--text-normal);
   font-weight: 600;
-  cursor: default;
 }
 
 .folder-nav-crumb-sep {
   flex: 0 0 auto;
-  font-size: var(--font-ui-smaller);
+  padding: 0 4px;
+  font-size: inherit;
   color: var(--text-faint);
+}
+
+.folder-nav .folder-nav-path-overflow,
+.folder-nav .folder-nav-crumb-home {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  padding: 0;
+}
+
+.folder-nav-path-overflow .svg-icon,
+.folder-nav-crumb-home .svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.folder-nav-breadcrumb-measure {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  max-width: none;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout;
+  font-size: var(--fn-path-size, var(--nav-item-size, var(--font-ui-small, 15px)));
+}
+
+.folder-nav-breadcrumb-measure .folder-nav-crumb {
+  flex: 0 0 auto;
+  max-width: none;
+  overflow: visible;
+}
+
+.folder-nav .folder-nav-crumb:focus-visible,
+.folder-nav .folder-nav-nav-button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
 }
 
 /* -------------------------------------------------------------------- list */
@@ -95,32 +191,39 @@
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 4px 6px;
+  min-height: 0;
 }
 
-.folder-nav-list:focus,
 .folder-nav-list:focus-visible {
-  outline: none;
+  outline: 1px solid var(--interactive-accent);
+  outline-offset: -1px;
 }
 
 .folder-nav-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
+  min-height: 34px;
+  padding: 5px 6px;
+  box-sizing: border-box;
   border-radius: var(--radius-s);
-  color: var(--nav-item-color);
-  font-size: var(--nav-item-size);
+  color: var(--nav-item-color, var(--text-normal));
+  font-size: var(--fn-list-size, var(--nav-item-size, var(--font-ui-small, 15px)));
+  font-weight: var(--nav-item-weight, 400);
+  line-height: 1.45;
   cursor: pointer;
 }
 
 .folder-nav-row:hover {
   background: var(--nav-item-background-hover);
   color: var(--nav-item-color-hover);
+  font-weight: var(--nav-item-weight-hover, var(--nav-item-weight, 400));
 }
 
 .folder-nav-row.is-selected {
   background: var(--nav-item-background-active);
   color: var(--nav-item-color-active);
+  font-weight: var(--nav-item-weight-active, var(--nav-item-weight, 400));
 }
 
 .folder-nav-row:focus {
@@ -135,12 +238,12 @@
 }
 
 .folder-nav-row-icon .svg-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-s, 18px);
+  height: var(--icon-s, 18px);
 }
 
-.folder-nav-row.is-folder .folder-nav-row-name {
-  font-weight: 500;
+.folder-nav-row.is-folder .folder-nav-row-icon {
+  color: var(--fn-manual-icon-color, currentColor);
 }
 
 .folder-nav-row-name {
@@ -148,6 +251,42 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Border Components: keep its existing switches as the source of truth.
+   Scope adapters to our own view, retaining the independent plugin/view IDs. */
+body.folder-font-bold .folder-nav-row.is-folder {
+  --nav-item-weight: bold;
+  --nav-item-weight-hover: bold;
+  --nav-item-weight-active: bold;
+}
+
+body.file-icon-remove .folder-nav-list .folder-nav-row-icon {
+  display: none;
+}
+
+body:not(.file-icon-remove).colorful-folder .folder-nav-row.is-folder .folder-nav-row-icon {
+  color: var(--fn-manual-icon-color, var(--fn-border-color, currentColor));
+}
+
+body.file-names-untrim .folder-nav-row-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+body.theme-light .folder-nav-row.is-selected {
+  color: var(--color-activated-file-light, var(--nav-item-color-active, var(--text-normal)));
+  background: var(--background-activated-file-light, var(--nav-item-background-active));
+  border-radius: var(--border-radius-activated-file-light, var(--radius-s));
+  box-shadow: var(--shadow-activated-file-light, none);
+}
+
+body.theme-dark .folder-nav-row.is-selected {
+  color: var(--color-activated-file-dark, var(--nav-item-color-active, var(--text-normal)));
+  background: var(--background-activated-file-dark, var(--nav-item-background-active));
+  border-radius: var(--border-radius-activated-file-dark, var(--radius-s));
+  box-shadow: var(--shadow-activated-file-dark, none);
 }
 
 .folder-nav-row-chevron {
@@ -179,28 +318,76 @@
   background-color: var(--fn-wash);
 }
 
-.folder-nav-row.has-tint {
+.folder-nav-row.has-tint:not(:hover):not(.is-selected) {
   background-color: var(--fn-tint);
 }
 
-/* background-image paints over background-color, so hover and selection layer
-   on top of the tint instead of replacing it. background-color is restated
-   because the plain :hover rule uses the `background` shorthand, which would
-   otherwise reset the tint. */
-.folder-nav-row.has-tint:hover {
-  background-color: var(--fn-tint);
-  background-image: linear-gradient(
-    var(--nav-item-background-hover),
-    var(--nav-item-background-hover)
-  );
+/* Keep theme hover/selection backgrounds above optional folder tinting. */
+
+.folder-nav-path-menu {
+  position: fixed;
+  z-index: var(--layer-menu, 1000);
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(60vh, 480px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-l, 0 8px 30px #0003);
+  font-family: var(--font-interface, inherit);
+  font-size: var(--fn-path-size, var(--nav-item-size, var(--font-ui-small, 15px)));
 }
 
-.folder-nav-row.has-tint.is-selected {
-  background-color: var(--fn-tint);
-  background-image: linear-gradient(
-    var(--nav-item-background-active),
-    var(--nav-item-background-active)
-  );
+.folder-nav-path-menu .folder-nav-path-menu-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: auto;
+  min-height: 40px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.folder-nav-path-menu .folder-nav-path-menu-item:hover,
+.folder-nav-path-menu .folder-nav-path-menu-item:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+.folder-nav-path-menu .folder-nav-path-menu-item:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.folder-nav-path-menu-label > span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.folder-nav-path-menu-level {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.78em;
+}
+
+.folder-nav-path-menu-icon .svg-icon,
+.folder-nav-path-menu-check .svg-icon {
+  width: 18px;
+  height: 18px;
 }
 
 /* ------------------------------------------------------------- colour picker */

@@ -1,0 +1,129 @@
+name: Release Obsidian plugin
+
+on:
+  push:
+    paths:
+      - manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    # Only the repository's default branch may publish, including manual runs.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+      id: ${{ steps.version.outputs.id }}
+      name: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect plugin version change
+        id: version
+        run: node .github/scripts/release-version.mjs
+
+  release:
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    concurrency:
+      group: plugin-release-${{ needs.version.outputs.version }}
+      cancel-in-progress: false
+    env:
+      PLUGIN_ID: ${{ needs.version.outputs.id }}
+      PLUGIN_VERSION: ${{ needs.version.outputs.version }}
+      PLUGIN_NAME: ${{ needs.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Run regression tests
+        run: npm test
+      - name: Build plugin
+        run: npm run build
+      - name: Package installable assets
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+          import shutil
+          import zipfile
+
+          out = Path('work/release')
+          out.mkdir(parents=True, exist_ok=True)
+          files = ['main.js', 'manifest.json', 'styles.css']
+          for name in files:
+              shutil.copyfile(name, out / name)
+          plugin_id = os.environ['PLUGIN_ID']
+          archive = out / f"{plugin_id}-{os.environ['PLUGIN_VERSION']}.zip"
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
+              for name in files:
+                  bundle.write(out / name, f'{plugin_id}/{name}')
+          with zipfile.ZipFile(archive) as bundle:
+              assert bundle.testzip() is None
+          checksums = ''.join(
+              f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
+              for path in [*(out / name for name in files), archive]
+          )
+          (out / 'SHA256SUMS.txt').write_text(checksums, encoding='utf-8')
+          PY
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(work/release/main.js work/release/manifest.json work/release/styles.css
+                  "work/release/$PLUGIN_ID-$PLUGIN_VERSION.zip" work/release/SHA256SUMS.txt)
+
+          # Never replace files in an already published release. An interrupted
+          # upload may be resumed only for a draft created from this commit.
+          existing=''
+          if existing=$(gh release view "$PLUGIN_VERSION" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft,databaseId,targetCommitish,url); then
+            if [[ $(jq -r '.isDraft' <<< "$existing") == false ]]; then
+              echo "Release already published: $(jq -r '.url' <<< "$existing")" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [[ $(jq -r '.targetCommitish' <<< "$existing") != "$GITHUB_SHA" ]]; then
+              echo 'Existing draft belongs to a different commit; refusing to overwrite it.' >&2
+              exit 1
+            fi
+          fi
+
+          tag_commit=$(git rev-parse --verify "refs/tags/$PLUGIN_VERSION^{commit}" 2>/dev/null || true)
+          if [[ -n "$tag_commit" && "$tag_commit" != "$GITHUB_SHA" ]]; then
+            echo 'Existing version tag points to a different commit.' >&2
+            exit 1
+          fi
+          if [[ -n "$existing" ]]; then
+            gh release upload "$PLUGIN_VERSION" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$PLUGIN_VERSION" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "$PLUGIN_NAME $PLUGIN_VERSION" --generate-notes --draft
+          fi
+          release_id=$(gh release view "$PLUGIN_VERSION" --repo "$GITHUB_REPOSITORY" \
+              --json databaseId --jq '.databaseId')
+          # legacy lets GitHub choose Latest by release date and semantic version
+          # when different versions finish building in a different order.
+          release_url=$(gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+              -F draft=false -f make_latest=legacy --jq '.html_url')
+          echo "Published $release_url" >> "$GITHUB_STEP_SUMMARY"

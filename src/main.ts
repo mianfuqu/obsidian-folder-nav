@@ -1,12 +1,17 @@
 import { Notice, Plugin, TFolder } from "obsidian";
 import { FolderNavView, VIEW_TYPE } from "./view";
-import { DEFAULT_SETTINGS, FolderNavSettings, FolderNavSettingTab } from "./settings";
+import { FolderNavSettingTab } from "./settings";
+import { FolderNavSettings, normalizeSettings } from "./config";
 import { FileExplorerTakeover } from "./takeover";
 import { ColorPickerModal } from "./colorPicker";
+import { paletteColor } from "./palette";
+import { isWithin } from "./paths";
 
 export default class FolderNavPlugin extends Plugin {
   settings!: FolderNavSettings;
   private takeover!: FileExplorerTakeover;
+  private pendingSettings: FolderNavSettings | null = null;
+  private settingsWrite: Promise<void> | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -47,6 +52,22 @@ export default class FolderNavPlugin extends Plugin {
         return true;
       },
     });
+
+    for (const direction of ["back", "forward"] as const) {
+      this.addCommand({
+        id: `go-${direction}`,
+        name: direction === "back" ? "后退到上一个目录" : "前进到下一个历史目录",
+        checkCallback: (checking) => {
+          const view = this.getView();
+          if (!view || !(direction === "back" ? view.canGoBack : view.canGoForward)) return false;
+          if (!checking) {
+            if (direction === "back") view.goBack();
+            else view.goForward();
+          }
+          return true;
+        },
+      });
+    }
 
     this.addCommand({
       id: "reveal-active-file",
@@ -97,10 +118,11 @@ export default class FolderNavPlugin extends Plugin {
   private registerColorMaintenance(): void {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
+        if (!(file instanceof TFolder)) return;
         const colors = this.settings.folderColors;
         let changed = false;
         for (const key of Object.keys(colors)) {
-          if (key === oldPath || key.startsWith(`${oldPath}/`)) {
+          if (isWithin(key, oldPath)) {
             colors[file.path + key.slice(oldPath.length)] = colors[key];
             delete colors[key];
             changed = true;
@@ -112,10 +134,11 @@ export default class FolderNavPlugin extends Plugin {
 
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
+        if (!(file instanceof TFolder)) return;
         const colors = this.settings.folderColors;
         let changed = false;
         for (const key of Object.keys(colors)) {
-          if (key === file.path || key.startsWith(`${file.path}/`)) {
+          if (isWithin(key, file.path)) {
             delete colors[key];
             changed = true;
           }
@@ -126,8 +149,8 @@ export default class FolderNavPlugin extends Plugin {
   }
 
   private async persistColorChange(): Promise<void> {
-    await this.saveSettings();
     this.refreshViews();
+    await this.saveSettings();
   }
 
   /**
@@ -137,6 +160,7 @@ export default class FolderNavPlugin extends Plugin {
    * which cannot be exercised programmatically.
    */
   async setFolderColor(path: string, colorId: string | null): Promise<void> {
+    if (colorId && !paletteColor(colorId)) return;
     if (colorId) {
       this.settings.folderColors[path] = colorId;
       this.settings.recentColors = [
@@ -150,7 +174,7 @@ export default class FolderNavPlugin extends Plugin {
   }
 
   async clearAllFolderColors(): Promise<void> {
-    this.settings.folderColors = {};
+    this.settings.folderColors = Object.create(null) as Record<string, string>;
     await this.persistColorChange();
   }
 
@@ -171,22 +195,46 @@ export default class FolderNavPlugin extends Plugin {
     }
   }
 
+  refreshAppearance(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      (leaf.view as FolderNavView).refreshAppearance();
+    }
+  }
+
   getView(): FolderNavView | null {
     const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
     return leaf ? (leaf.view as FolderNavView) : null;
   }
 
   async loadSettings(): Promise<void> {
-    const stored = ((await this.loadData()) ?? {}) as Partial<FolderNavSettings>;
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, stored);
-    // Object.assign is shallow: without these two lines the settings object
-    // would share its containers with DEFAULT_SETTINGS, and assigning a colour
-    // would mutate the defaults themselves for the rest of the session.
-    this.settings.folderColors = { ...(stored.folderColors ?? {}) };
-    this.settings.recentColors = [...(stored.recentColors ?? [])];
+    this.settings = normalizeSettings(await this.loadData());
   }
 
-  async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+  saveSettings(): Promise<void> {
+    this.pendingSettings = {
+      ...this.settings,
+      folderColors: { ...this.settings.folderColors },
+      recentColors: [...this.settings.recentColors],
+      navigation: this.settings.navigation ? {
+        ...this.settings.navigation,
+        history: [...this.settings.navigation.history],
+      } : null,
+    };
+    // Slider input can outpace disk writes. Serialize writes and retain only
+    // the latest pending snapshot so an older save never wins a race.
+    if (!this.settingsWrite) {
+      this.settingsWrite = Promise.resolve().then(async () => {
+        try {
+          while (this.pendingSettings) {
+            const snapshot = this.pendingSettings;
+            this.pendingSettings = null;
+            await this.saveData(snapshot);
+          }
+        } finally {
+          this.settingsWrite = null;
+        }
+      });
+    }
+    return this.settingsWrite;
   }
 }
