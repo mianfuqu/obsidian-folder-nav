@@ -2,6 +2,14 @@ import { paletteColor } from "./palette";
 
 export type SortMode = "folders-first" | "native";
 
+export interface NavigationState {
+  currentPath: string;
+  history: string[];
+  historyIndex: number;
+  selectedPath: string | null;
+  scrollTop: number;
+}
+
 export interface FolderNavSettings {
   enabled: boolean;
   sortMode: SortMode;
@@ -16,6 +24,7 @@ export interface FolderNavSettings {
   /** null follows the theme; numeric values explicitly override it in pixels. */
   pathFontSize: number | null;
   listFontSize: number | null;
+  navigation: NavigationState | null;
 }
 
 export const DEFAULT_SETTINGS: FolderNavSettings = {
@@ -31,6 +40,7 @@ export const DEFAULT_SETTINGS: FolderNavSettings = {
   colorWash: 14,
   pathFontSize: null,
   listFontSize: null,
+  navigation: null,
 };
 
 const SORT_ORDERS = new Set([
@@ -40,6 +50,29 @@ const SORT_ORDERS = new Set([
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeNavigation(value: unknown): NavigationState | null {
+  if (!isRecord(value) || typeof value.currentPath !== "string") return null;
+  const currentPath = value.currentPath;
+  let history = [currentPath];
+  let historyIndex = 0;
+  if (Array.isArray(value.history) && value.history.length > 0 &&
+      value.history.every((path: unknown) => typeof path === "string") &&
+      typeof value.historyIndex === "number" && Number.isInteger(value.historyIndex) &&
+      value.historyIndex >= 0 && value.historyIndex < value.history.length &&
+      value.history[value.historyIndex] === currentPath) {
+    history = [...value.history] as string[];
+    historyIndex = value.historyIndex;
+  }
+  return {
+    currentPath,
+    history,
+    historyIndex,
+    selectedPath: typeof value.selectedPath === "string" && value.selectedPath ? value.selectedPath : null,
+    scrollTop: typeof value.scrollTop === "number" && Number.isFinite(value.scrollTop)
+      ? Math.max(0, value.scrollTop) : 0,
+  };
 }
 
 /** Treat data.json as input, including older or partially synced settings. */
@@ -79,5 +112,6 @@ export function normalizeSettings(value: unknown): FolderNavSettings {
       (id): id is string => typeof id === "string" && paletteColor(id) !== null
     ))].slice(0, 6);
   }
+  settings.navigation = normalizeNavigation(stored.navigation);
   return settings;
 }

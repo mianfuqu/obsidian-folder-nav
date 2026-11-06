@@ -109,14 +109,17 @@ test("slider saves coalesce bursts, serialize disk writes, and keep independent 
   };
   plugin.saveSettings();
   plugin.settings.pathFontSize = 16;
+  plugin.settings.navigation = {currentPath: "A", history: ["", "A"], historyIndex: 1, selectedPath: null, scrollTop: 0};
   plugin.saveSettings();
   await Promise.resolve();
   assert.equal(writes.length, 1);
   assert.equal(writes[0].pathFontSize, 16);
+  plugin.settings.navigation.history.push("B");
   plugin.settings.pathFontSize = 18; plugin.saveSettings();
   plugin.settings.pathFontSize = 20; const done = plugin.saveSettings();
   release(); await done;
   assert.equal(writes.length, 2);
   assert.equal(writes[0].pathFontSize, 16);
+  assert.deepEqual(Array.from(writes[0].navigation.history), ["", "A"]);
   assert.equal(writes[1].pathFontSize, 20);
 });

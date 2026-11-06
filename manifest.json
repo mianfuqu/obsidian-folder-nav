@@ -1,10 +1,10 @@
 {
   "id": "folder-nav-ooeooo",
   "name": "Folder Nav",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "minAppVersion": "1.8.7",
   "description": "Browse the sidebar one folder at a time instead of scrolling an indented tree. Click into a folder, follow the breadcrumb back.",
   "author": "mianfuqu / ooeooo",
-  "authorUrl": "https://github.com/ooeooo/obsidian-folder-nav",
+  "authorUrl": "https://github.com/Obsidian-Projects/obsidian-folder-nav",
   "isDesktopOnly": false
 }

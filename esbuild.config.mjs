@@ -21,7 +21,7 @@ const ASSETS = ["manifest.json", "styles.css"];
 
 const banner = `/*
 Folder Nav — bundled by esbuild
-Source: https://github.com/ooeooo/obsidian-folder-nav
+Source: https://github.com/Obsidian-Projects/obsidian-folder-nav
 Upstream: https://github.com/mianfuqu/obsidian-folder-nav
 */`;
 

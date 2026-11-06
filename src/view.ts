@@ -16,6 +16,7 @@ import { applyRootFilter, sortChildren } from "./sort";
 import { isWithin, parentPath, rebasePath } from "./paths";
 import { BorderFolderColors } from "./border";
 import { PathMenu } from "./pathMenu";
+import type { NavigationState } from "./config";
 
 export const VIEW_TYPE = "folder-nav-ooeooo-view";
 
@@ -29,6 +30,10 @@ export class FolderNavView extends ItemView {
   private history: string[] = [ROOT];
   private historyIndex = 0;
   private selectedPath: string | null = null;
+  private pendingScrollTop: number | null = null;
+  private lastKnownScrollTop = 0;
+  private scrollSaveTimer: number | null = null;
+  private restoringWorkspace = false;
 
   private backEl!: HTMLButtonElement;
   private forwardEl!: HTMLButtonElement;
@@ -78,6 +83,7 @@ export class FolderNavView extends ItemView {
   async onOpen(): Promise<void> {
     const root = this.contentEl;
     this.viewWindow = root.ownerDocument.defaultView ?? window;
+    this.restoreNavigation();
     this.opened = true;
     root.empty();
     root.addClass("folder-nav");
@@ -127,6 +133,7 @@ export class FolderNavView extends ItemView {
     this.registerDomEvent(this.listEl, "mousedown", (evt) => {
       if (!(evt.target as HTMLElement).closest(".folder-nav-row")) this.listEl.focus();
     });
+    this.registerDomEvent(this.listEl, "scroll", () => this.scheduleScrollSave());
 
     this.registerEvent(this.plugin.app.vault.on("create", (file) => this.onVaultChanged(file)));
     this.registerEvent(this.plugin.app.vault.on("delete", (file) => this.onVaultChanged(file)));
@@ -144,15 +151,25 @@ export class FolderNavView extends ItemView {
     );
     this.registerEvent(this.plugin.app.workspace.on("css-change", () => this.requestBreadcrumbLayout()));
     if (this.viewWindow.ResizeObserver) {
-      this.crumbObserver = new this.viewWindow.ResizeObserver(() => this.requestBreadcrumbLayout());
+      this.crumbObserver = new this.viewWindow.ResizeObserver(() => {
+        this.requestBreadcrumbLayout();
+        this.restoreScrollPosition();
+      });
       this.crumbObserver.observe(this.crumbEl);
       // Natural text width also changes with theme fonts, font size and font loading.
       this.crumbObserver.observe(this.crumbMeasureEl);
+      this.crumbObserver.observe(this.listEl);
     } else {
-      this.registerDomEvent(this.viewWindow, "resize", () => this.requestBreadcrumbLayout());
+      this.registerDomEvent(this.viewWindow, "resize", () => {
+        this.requestBreadcrumbLayout();
+        this.restoreScrollPosition();
+      });
     }
 
     this.render();
+    if (this.selectedPath && !this.rows.has(this.selectedPath)) this.selectedPath = null;
+    this.restoreScrollPosition();
+    if (this.plugin.settings.navigation) this.saveNavigation();
     this.listEl.focus();
   }
 
@@ -166,6 +183,9 @@ export class FolderNavView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    if (this.scrollSaveTimer !== null) this.viewWindow.clearTimeout(this.scrollSaveTimer);
+    this.scrollSaveTimer = null;
+    const saving = this.persistNavigation(true);
     this.opened = false;
     this.cancelRefresh();
     if (this.crumbFrame !== null) this.viewWindow.cancelAnimationFrame(this.crumbFrame);
@@ -181,9 +201,80 @@ export class FolderNavView extends ItemView {
     this.crumbPath = null;
     this.crumbVaultName = null;
     this.contentEl.empty();
+    try {
+      await saving;
+    } catch (error) {
+      console.error("Folder Nav: cannot save navigation", error);
+    }
   }
 
   // ---------------------------------------------------------------- navigation
+
+  private restoreNavigation(): void {
+    const saved = this.plugin.settings.navigation;
+    if (!saved) return;
+    this.currentPath = this.normalize(saved.currentPath);
+    this.history = [...saved.history];
+    this.historyIndex = saved.historyIndex;
+    this.history[this.historyIndex] = this.currentPath;
+    const sameFolder = this.currentPath === saved.currentPath;
+    const selected = sameFolder && saved.selectedPath
+      ? this.plugin.app.vault.getAbstractFileByPath(saved.selectedPath) : null;
+    this.selectedPath = selected && this.parentPathOf(selected) === this.currentPath ? selected.path : null;
+    this.pendingScrollTop = sameFolder ? saved.scrollTop : 0;
+    this.lastKnownScrollTop = this.pendingScrollTop;
+
+    // File-open events emitted while Obsidian restores its layout should not
+    // override the directory the user was browsing before closing the app.
+    const workspace = this.plugin.app.workspace;
+    if (workspace.layoutReady === false) {
+      this.restoringWorkspace = true;
+      workspace.onLayoutReady(() => { this.restoringWorkspace = false; });
+    }
+  }
+
+  private restoreScrollPosition(): void {
+    if (!this.opened || this.pendingScrollTop === null || this.listEl.clientHeight === 0) return;
+    const scrollTop = this.pendingScrollTop;
+    this.pendingScrollTop = null;
+    this.listEl.scrollTop = scrollTop;
+    this.lastKnownScrollTop = this.listEl.scrollTop;
+  }
+
+  private scheduleScrollSave(): void {
+    // Hidden elements report scrollTop as zero; retain the last visible value.
+    if (this.listEl.clientHeight === 0) return;
+    this.lastKnownScrollTop = this.listEl.scrollTop;
+    if (this.scrollSaveTimer !== null) this.viewWindow.clearTimeout(this.scrollSaveTimer);
+    this.scrollSaveTimer = this.viewWindow.setTimeout(() => {
+      this.scrollSaveTimer = null;
+      if (this.opened) this.saveNavigation();
+    }, 300);
+  }
+
+  private saveNavigation(): void {
+    void this.persistNavigation().catch((error: unknown) => console.error("Folder Nav: cannot save navigation", error));
+  }
+
+  private persistNavigation(force = false): Promise<void> {
+    if (this.pendingScrollTop === null && this.listEl.clientHeight > 0) {
+      this.lastKnownScrollTop = this.listEl.scrollTop;
+    }
+    const next: NavigationState = {
+      currentPath: this.currentPath,
+      history: [...this.history],
+      historyIndex: this.historyIndex,
+      selectedPath: this.selectedPath,
+      scrollTop: this.pendingScrollTop ?? this.lastKnownScrollTop,
+    };
+    const previous = this.plugin.settings.navigation;
+    if (!force && previous && previous.currentPath === next.currentPath &&
+        previous.historyIndex === next.historyIndex && previous.selectedPath === next.selectedPath &&
+        previous.scrollTop === next.scrollTop && previous.history.length === next.history.length &&
+        previous.history.every((path, index) => path === next.history[index])) return Promise.resolve();
+    this.plugin.settings.navigation = next;
+    return this.plugin.saveSettings();
+  }
 
   navigateTo(path: string, pushHistory = true): void {
     const target = this.normalize(path);
@@ -194,8 +285,11 @@ export class FolderNavView extends ItemView {
       this.historyIndex = this.history.length - 1;
     }
     this.currentPath = target;
+    this.pendingScrollTop = null;
+    this.lastKnownScrollTop = 0;
     this.select(null, false);
     this.render();
+    this.saveNavigation();
     this.focusIfEngaged();
   }
 
@@ -223,8 +317,11 @@ export class FolderNavView extends ItemView {
     this.historyIndex = index;
     this.currentPath = this.normalize(this.history[this.historyIndex]);
     this.history[this.historyIndex] = this.currentPath;
+    this.pendingScrollTop = null;
+    this.lastKnownScrollTop = 0;
     this.select(null, false);
     this.render();
+    this.saveNavigation();
     this.focusIfEngaged();
   }
 
@@ -500,12 +597,14 @@ export class FolderNavView extends ItemView {
   }
 
   private select(path: string | null, scroll = true): void {
-    if (this.selectedPath !== path) {
+    const changed = this.selectedPath !== path;
+    if (changed) {
       if (this.selectedPath) this.rows.get(this.selectedPath)?.el.removeClass("is-selected");
       if (path) this.rows.get(path)?.el.addClass("is-selected");
     }
     this.selectedPath = path;
     if (scroll && path) this.rows.get(path)?.el.scrollIntoView({ block: "nearest" });
+    if (changed) this.saveNavigation();
   }
 
   private onKeyDown(evt: KeyboardEvent): void {
@@ -606,12 +705,13 @@ export class FolderNavView extends ItemView {
     if (this.selectedPath) {
       this.select(rebasePath(this.selectedPath, oldPath, file.path), false);
     }
+    this.saveNavigation();
     if (oldCurrent !== this.currentPath || this.parentPathOf(file) === this.currentPath ||
         parentPath(oldPath) === this.currentPath) this.refresh();
   }
 
   private onFileOpen(file: TFile | null): void {
-    if (!file) return;
+    if (!file || this.restoringWorkspace) return;
     if (this.plugin.settings.autoReveal) {
       this.revealFile(file);
       return;

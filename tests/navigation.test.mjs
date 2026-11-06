@@ -1,8 +1,153 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadPlugin, makeView, TFolder, flushFrames, pendingFrames, resizeObservers } from "./helpers.mjs";
+import { loadPlugin, makeView, TFile, TFolder, flushFrames, pendingFrames, resizeObservers } from "./helpers.mjs";
 
 const api = await loadPlugin();
+
+test("native takeover during unload and a fresh plugin startup retain the saved directory", async () => {
+  const {view: unused, plugin: host, workspace, add} = await makeView(api, 0);
+  await unused.onClose();
+  add(new TFolder("Projects"));
+  let disk;
+  const first = new api.FolderNavPlugin();
+  first.app = host.app;
+  first.settings = api.normalizeSettings(null);
+  first.saveData = async snapshot => { disk = JSON.parse(JSON.stringify(snapshot)); };
+  let activePlugin = first;
+  let operation;
+  const leaf = {
+    type: api.VIEW_TYPE,
+    getViewState() { return {type: this.type, state: {sortOrder: "alphabetical", autoReveal: false}}; },
+    setViewState(state) {
+      operation = (async () => {
+        if (this.view instanceof api.FolderNavView) await this.view.onClose();
+        this.type = state.type;
+        if (state.type === api.VIEW_TYPE) {
+          this.view = new api.FolderNavView(this, activePlugin);
+          await this.view.onOpen();
+        } else this.view = {};
+      })();
+      return operation;
+    },
+  };
+  workspace.getLeavesOfType = type => leaf.type === type ? [leaf] : [];
+  leaf.view = new api.FolderNavView(leaf, first);
+  await leaf.view.onOpen();
+  leaf.view.navigateTo("Projects");
+  new api.FileExplorerTakeover(first).restoreOnUnload();
+  await operation;
+  assert.equal(leaf.type, "file-explorer");
+  assert.equal(disk.navigation.currentPath, "Projects");
+
+  const reopened = new api.FolderNavPlugin();
+  reopened.app = host.app;
+  reopened.settings = api.normalizeSettings(disk);
+  reopened.saveData = async snapshot => { disk = JSON.parse(JSON.stringify(snapshot)); };
+  activePlugin = reopened;
+  const takeover = new api.FileExplorerTakeover(reopened);
+  takeover.enable();
+  await operation;
+  assert.equal(leaf.type, api.VIEW_TYPE);
+  assert.equal(leaf.view.currentPath, "Projects");
+  takeover.restoreOnUnload();
+  await operation;
+});
+
+test("a fresh view restores the directory, history, selection, and scroll from saved data", async () => {
+  const {view, plugin, add} = await makeView(api, 0);
+  const a = add(new TFolder("A"));
+  const b = add(new TFolder("A/B"), a);
+  add(new TFolder("A/B/C"), b);
+  add(new TFile("A/B/note.md"), b);
+  let disk;
+  plugin.saveSettings = async () => { disk = JSON.parse(JSON.stringify(plugin.settings)); };
+
+  view.navigateTo("A"); view.navigateTo("A/B"); view.navigateTo("A/B/C"); view.goBack();
+  view.select("A/B/note.md", false);
+  view.listEl.scrollTop = 135;
+  view.listEl.dispatch("scroll");
+  // A hidden sidebar can report zero before the view's close handler runs.
+  view.listEl.clientHeight = 0;
+  view.listEl.scrollTop = 0;
+  await view.onClose(); // Also flushes a pending scroll save.
+
+  const reopenedPlugin = {...plugin, settings: api.normalizeSettings(disk)};
+  reopenedPlugin.saveSettings = async () => {};
+  const reopened = new api.FolderNavView({}, reopenedPlugin);
+  await reopened.onOpen();
+  assert.equal(reopened.currentPath, "A/B");
+  assert.equal(reopened.selectedPath, "A/B/note.md");
+  assert.equal(reopened.rows.get("A/B/note.md").el.classes.has("is-selected"), true);
+  assert.equal(reopened.listEl.scrollTop, 135);
+  assert.equal(reopened.canGoBack, true);
+  assert.equal(reopened.canGoForward, true);
+  reopened.goForward(); assert.equal(reopened.currentPath, "A/B/C");
+  reopened.goBack(); reopened.goBack(); assert.equal(reopened.currentPath, "A");
+  await reopened.onClose();
+});
+
+test("a missing saved folder restores its nearest ancestor and discards the old selection and scroll", async () => {
+  const {view, plugin, add, files} = await makeView(api, 0);
+  const a = add(new TFolder("A"));
+  const b = add(new TFolder("A/B"), a);
+  add(new TFile("A/B/note.md"), b);
+  view.navigateTo("A/B"); view.select("A/B/note.md", false); view.listEl.scrollTop = 90;
+  await view.onClose();
+  const settings = api.normalizeSettings(JSON.parse(JSON.stringify(plugin.settings)));
+  files.delete("A/B"); files.delete("A/B/note.md"); a.children = [];
+  const reopened = new api.FolderNavView({}, {...plugin, settings});
+  await reopened.onOpen();
+  assert.equal(reopened.currentPath, "A");
+  assert.equal(reopened.history[reopened.historyIndex], "A");
+  assert.equal(reopened.selectedPath, null);
+  assert.equal(reopened.listEl.scrollTop, 0);
+  assert.equal(settings.navigation.currentPath, "A");
+  await reopened.onClose();
+});
+
+test("a renamed folder in back history is persisted even when it is not the current folder", async () => {
+  const {view, plugin, add, files} = await makeView(api, 0);
+  const folder = add(new TFolder("A"));
+  add(new TFolder("B"));
+  view.navigateTo("A"); view.navigateTo("B");
+  files.delete("A"); folder.path = "Renamed"; folder.name = "Renamed"; files.set(folder.path, folder);
+  view.onRenamed(folder, "A");
+  await view.onClose();
+  const reopened = new api.FolderNavView({}, {...plugin, settings: api.normalizeSettings(plugin.settings)});
+  await reopened.onOpen();
+  reopened.goBack(); assert.equal(reopened.currentPath, "Renamed");
+  await reopened.onClose();
+});
+
+test("layout restoration ignores startup file-open events until the workspace is ready", async () => {
+  const {view, plugin, add, workspace} = await makeView(api, 0);
+  add(new TFolder("A"));
+  const file = add(new TFile("root.md"));
+  view.navigateTo("A"); await view.onClose();
+  plugin.settings.autoReveal = true;
+  workspace.layoutReady = false;
+  let ready;
+  workspace.onLayoutReady = callback => { ready = callback; };
+  const reopened = new api.FolderNavView({}, plugin);
+  await reopened.onOpen();
+  reopened.onFileOpen(file); assert.equal(reopened.currentPath, "A");
+  workspace.layoutReady = true; ready();
+  reopened.onFileOpen(file); assert.equal(reopened.currentPath, "");
+  await reopened.onClose();
+});
+
+test("invalid saved navigation falls back to a safe history and scroll position", () => {
+  assert.equal(api.normalizeSettings({navigation: {currentPath: 3}}).navigation, null);
+  const restored = api.normalizeSettings({navigation: {
+    currentPath: "A", history: ["", 3, "A"], historyIndex: 2,
+    selectedPath: {}, scrollTop: -Infinity,
+  }}).navigation;
+  assert.equal(restored.currentPath, "A");
+  assert.deepEqual(Array.from(restored.history), ["A"]);
+  assert.equal(restored.historyIndex, 0);
+  assert.equal(restored.selectedPath, null);
+  assert.equal(restored.scrollTop, 0);
+});
 
 test("root breadcrumb uses an accessible home icon while the full-path menu retains the vault name", async () => {
   const {view, add} = await makeView(api, 0);

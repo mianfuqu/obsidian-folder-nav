@@ -19,6 +19,7 @@ export const viewWindow = {
   requestAnimationFrame(callback) { frames.set(++frameId, callback); return frameId; },
   cancelAnimationFrame(id) { frames.delete(id); },
   ResizeObserver,
+  setTimeout, clearTimeout,
   innerWidth: 1024, innerHeight: 800,
   addEventListener() {}, removeEventListener() {},
 };
@@ -87,6 +88,8 @@ export class Element {
   getAttribute(name) { return this.attributes.get(name) ?? null; }
   get clientWidth() { return this._clientWidth ?? 240; }
   set clientWidth(value) { this._clientWidth = value; }
+  get clientHeight() { return this._clientHeight ?? 400; }
+  set clientHeight(value) { this._clientHeight = value; }
   getBoundingClientRect() {
     const width = this.classes.has("folder-nav-crumb-home") ? 28
       : this.classes.has("folder-nav-crumb-sep") ? 16
@@ -241,8 +244,8 @@ export async function makeView(api, count = 3) {
     getRoot: () => root, getName: () => "Test vault",
     getAbstractFileByPath: path => files.get(path) ?? null,
   });
-  const workspace = Object.assign(emitter(), { getLeaf: () => ({openFile: file => { opened.push(file); }}), getActiveFile: () => null });
-  const plugin = { settings: api.normalizeSettings(null), app: { vault, workspace } };
+  const workspace = Object.assign(emitter(), { layoutReady: true, onLayoutReady: callback => callback(), getLeaf: () => ({openFile: file => { opened.push(file); }}), getActiveFile: () => null });
+  const plugin = { settings: api.normalizeSettings(null), app: { vault, workspace }, saveSettings: async () => {} };
   function add(file, parent = root) {
     parent.children.push(file); file.parent = parent; file.vault = vault; files.set(file.path, file); return file;
   }

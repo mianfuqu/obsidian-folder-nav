@@ -215,6 +215,10 @@ export default class FolderNavPlugin extends Plugin {
       ...this.settings,
       folderColors: { ...this.settings.folderColors },
       recentColors: [...this.settings.recentColors],
+      navigation: this.settings.navigation ? {
+        ...this.settings.navigation,
+        history: [...this.settings.navigation.history],
+      } : null,
     };
     // Slider input can outpace disk writes. Serialize writes and retain only
     // the latest pending snapshot so an older save never wins a race.

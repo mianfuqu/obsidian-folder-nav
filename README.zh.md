@@ -18,7 +18,7 @@
 **Folder Nav**。显示名称与原版相同，但 Obsidian 按独立插件 ID
 `folder-nav-ooeooo` 识别更新来源，与官方插件库中的 `folder-nav` 分开。
 Obsidian 不会再用官方 `folder-nav` 的版本覆盖这个分支。
-后续请从[本仓库 Releases](https://github.com/ooeooo/obsidian-folder-nav/releases)更新。
+后续请从[本仓库 Releases](https://github.com/Obsidian-Projects/obsidian-folder-nav/releases)更新。
 
 1. 在 Obsidian 中禁用旧的 Folder Nav；如需保留设置，先备份
    `.obsidian/plugins/folder-nav/data.json`（如果存在）。
@@ -82,6 +82,10 @@ Folder Nav 让侧栏的层级深度恒定:你看见的是自己正站着的那�
 
 后退后进入新目录会清除原来的前进记录；重复进入当前位置不会新增历史。
 路径菜单支持方向键、Home/End、Enter 和 Esc，关闭菜单后可回到触发按钮。
+
+当前目录、前进后退记录、选中项和列表滚动位置保存在插件的 `data.json` 中；
+重新打开导航视图或重启 Obsidian 后会恢复。如果保存的目录已不存在，会回到最近的现存上级。
+开启「自动定位当前文件」时，之后切换笔记仍会跳转到对应的文件夹。
 
 **命令**(也可以在 设置 → 快捷键 里自行绑定)
 

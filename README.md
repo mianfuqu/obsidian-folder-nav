@@ -18,7 +18,7 @@ Starting with `0.2.5`, its plugin ID is **`folder-nav-ooeooo`**. From `0.2.7`, i
 name is **Folder Nav**. Obsidian uses the independent plugin ID to identify it
 separately from the community-listed `folder-nav`, even though their display
 names match, so upstream updates will not replace this fork.
-Get future updates from [this repository's Releases](https://github.com/ooeooo/obsidian-folder-nav/releases).
+Get future updates from [this repository's Releases](https://github.com/Obsidian-Projects/obsidian-folder-nav/releases).
 
 1. Disable the old Folder Nav. To retain settings, first back up
    `.obsidian/plugins/folder-nav/data.json`, if it exists.
@@ -85,6 +85,12 @@ ancestor. The path refits when the sidebar width, font size, or theme font chang
 Navigating somewhere new after going back discards the old forward branch; repeated
 visits to the current location do not add history. The path menu supports arrows,
 Home/End, Enter, and Escape with focus restoration.
+
+The current folder, back/forward history, selection, and list scroll position are
+saved in the plugin's `data.json` and restored when the navigation view reopens,
+including after restarting Obsidian. If a saved folder no longer exists, the
+nearest existing parent is opened. With auto-reveal enabled, switching notes can
+subsequently move the view to the active note's folder.
 
 **Commands** (also bindable in Settings → Hotkeys)
 
